@@ -116,16 +116,19 @@
   .diephys.shape4{align-items:flex-end;padding-bottom:4px}
   .diephys.shape10,.diephys.shape12{align-items:center;padding-bottom:0}
   .diephys.settle{animation:settle .35s cubic-bezier(.2,1.4,.4,1)}
+  .gcard.activeCard{border-color:var(--ok);box-shadow:0 0 10px rgba(90,164,106,.45)}
   @keyframes settle{0%{transform:scale(1.35) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
   .outcome{font-family:Georgia,serif;font-size:18px;font-weight:700;margin:8px 0}
   .outcome.hope{color:var(--hope)}.outcome.fear{color:#c89df0}.outcome.crit{color:var(--gold)}.outcome.fail{color:#d98a82}
 
-  #logwrap{flex:0 0 150px;border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
-  #logentries{flex:1;overflow:auto;padding:8px 10px;font-size:13px}
-  .le{padding:3px 0;border-bottom:1px solid #2a221b}
+  #logwrap{flex:0 0 84px;max-height:84px;min-height:0;overflow:hidden;border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
+  #logentries{flex:1;min-height:0;overflow-y:auto;padding:2px 10px;font-size:12px;line-height:1.3}
+  .le{padding:1px 0;border-bottom:1px solid #2a221b}
   .le .who{color:var(--gold);font-weight:600}
   .le .sys{color:var(--dim);font-style:italic}
-  #logbar{display:flex;gap:6px;padding:6px;border-top:1px solid var(--line)}
+  #logbar{display:flex;gap:6px;padding:4px 6px;border-top:1px solid var(--line)}
+  body.logmin #logentries{display:none}
+  body.logmin #logwrap{flex:0 0 42px;max-height:42px}
   #logbar input{flex:1}
 
   .card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
@@ -196,8 +199,8 @@
     <h1>🜂 HellHeart VTT</h1>
     <span class="tag" id="roleTag">solo</span>
     <span class="pill"><span class="dot" id="netdot"></span><span id="netlabel">offline</span></span>
-    <span class="pill" id="roomPill" style="display:none">Room <b id="roomCode" style="color:var(--gold)">—</b>
-      <button class="sm" onclick="copyRoom()">copy</button></span>
+    <span class="pill" id="roomPill" style="display:none;cursor:pointer" onclick="openRoom()" title="see who's at the table">Room <b id="roomCode" style="color:var(--gold)">—</b>
+      <button class="sm" onclick="event.stopPropagation();copyRoom()">copy</button></span>
     <span class="muted" id="peerCount"></span>
     <div class="spacer"></div>
     <button class="primary sm" onclick="quickDuality()" title="Roll Hope &amp; Fear with your active character">⚄ Duality Roll</button>
@@ -216,6 +219,7 @@
     <div id="logbar">
       <input id="chatin" placeholder="table chat… (everyone sees rolls &amp; messages)" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="sm" onclick="sendChat()">send</button>
+      <button class="sm" onclick="document.body.classList.toggle('logmin')" title="collapse / expand the log">▾▴</button>
     </div>
   </div>
 </div>
@@ -404,38 +408,17 @@
 
   <!-- DICE -->
   <div class="panel scroll" id="panel-dice" data-pane="dice" data-label="Dice">
-    <h3>Duality Roll</h3>
-    <div class="card">
-      <div class="row">
-        <div class="col"><label>Acting character</label><select id="d-char"></select></div>
-        <div class="col"><label>Trait</label>
-          <select id="d-trait">
-            <option value="agility">Agility</option><option value="strength">Strength</option>
-            <option value="finesse">Finesse</option><option value="instinct">Instinct</option>
-            <option value="presence">Presence</option><option value="knowledge">Knowledge</option>
-            <option value="0">none / flat</option>
-          </select></div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <div class="col"><label>Other mod</label><input id="d-mod" type="number" value="0" style="width:56px"></div>
-        <div class="col"><label>Difficulty</label><input id="d-diff" type="number" placeholder="—" style="width:66px"></div>
-        <div class="col"><label>Adv/Dis</label>
-          <select id="d-adv"><option value="0">none</option><option value="1">advantage</option><option value="-1">disadvantage</option></select></div>
-      </div>
-      <div class="row" style="margin-top:8px"><label><input type="checkbox" id="d-exp"> spend Hope for Experience (+2)</label></div>
-      <div class="row" style="margin-top:10px">
-        <button class="primary" onclick="rollDuality()">⚄ Roll Hope &amp; Fear</button>
-        <button onclick="rollPlain()">Plain dice…</button>
-      </div>
-    </div>
-    <div class="card" id="d-result"><span class="muted">No roll yet. Hope &amp; Fear are both d12 — everyone at the table sees your rolls.</span></div>
     <div class="card"><h4>Dice Pool</h4>
       <div class="row" id="dieShelf"></div>
+      <div class="row" id="traitChips" style="margin-top:6px"></div>
       <div class="row" style="margin-top:6px"><div id="poolView" class="row" style="flex:1;min-height:24px"></div></div>
       <div class="row" style="margin-top:6px"><label>modifier</label><input id="poolMod" type="number" value="0" style="width:60px">
         <button class="primary sm" onclick="rollPool()">🎲 Roll</button>
+        <button class="sm" style="border-color:var(--hope);color:var(--hope)" onclick="dualityPool()">🎭 Duality</button>
+        <button class="sm" id="advBtn" onclick="tgAdv(1)" title="advantage: +d6 on your next duality roll (RAW)">▲ Adv</button>
+        <button class="sm" id="disBtn" onclick="tgAdv(-1)" title="disadvantage: −d6 on your next duality roll (RAW)">▼ Dis</button>
         <button class="sm" onclick="clearPool()">clear</button></div>
-      <p class="muted" style="font-size:11px;margin:4px 0 0">e.g. 2d4+6d6+5 → click d4 twice, d6 six times, set modifier 5, Roll.</p>
+      <p class="muted" style="font-size:11px;margin:4px 0 0">trait buttons add their modifier · ×Prof multiplies the dice · 🎭 rolls Hope &amp; Fear + modifiers</p>
     </div>
     <div class="card"><h4>Quick rolls — gear, cards &amp; NPCs</h4><div id="qaList"></div></div>
   </div>
@@ -508,7 +491,7 @@ function terrainStyle(id){
 }
 
 let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], characters:{}, fear:0,
-  npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, log:[], lastRoll:null };
+  npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], log:[], lastRoll:null };
 let ME={ id:null, name:'', isHost:false, role:'player', peer:null, conns:[], hostConn:null };
 let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=null, stepQueue=[], stepCtx=null, npcEditId=null, activeTab=null;
 
@@ -525,13 +508,18 @@ function hostRoom(){
     document.getElementById('roomPill').style.display='';
     document.getElementById('roleTag').textContent='GM (host)';
     setDot('host','hosting'); setStatus('Hosting '+code+'.'); closeModal('connectModal');
+    STATE.presence=[{id:'gm',name:ME.name,role:'GM'}];
     layout('gm');
   });
   ME.peer.on('connection',conn=>{
     conn.on('open',()=>{ ME.conns.push(conn); conn.send({t:'state',state:STATE}); updatePeerCount();
+      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer);
+      STATE.presence.push({id:conn.peer,name:(conn.metadata&&conn.metadata.name)||'Player',role:'Player'});
       log(null,conn.metadata?.name||'A player',' joined the table.',true); });
     conn.on('data',d=>hostReceive(conn,d));
-    conn.on('close',()=>{ ME.conns=ME.conns.filter(c=>c!==conn); updatePeerCount(); });
+    conn.on('close',()=>{ ME.conns=ME.conns.filter(c=>c!==conn);
+      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer); updatePeerCount();
+      log(null,(conn.metadata&&conn.metadata.name)||'A player',' left the table.',true); });
   });
   ME.peer.on('error',e=>{ setStatus('Error: '+e.type+'. Try again.'); });
 }
@@ -585,10 +573,17 @@ function apply(a){
     case 'addtoken': STATE.tokens.push(a.token); break;
     case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;} break;}
     case 'deltoken': STATE.tokens=STATE.tokens.filter(t=>t.id!==a.id); break;
-    case 'upchar':{const isNew=!STATE.characters[a.char.id]; STATE.characters[a.char.id]=a.char;
+    case 'upchar':{const isNew=!STATE.characters[a.char.id];
+      if(isNew&&a.char.owner&&a.char.owner!==ME.id&&Object.values(STATE.characters).some(c=>c.owner===a.char.owner))break;
+      STATE.characters[a.char.id]=a.char;
       if(isNew&&a.char.owner!=='gm'&&!STATE.initiative.some(x=>x.refId===a.char.id))STATE.initiative.push({id:rid(4),refId:a.char.id,name:a.char.name,note:'PC'});
       break;}
-    case 'claimchar':{const ch=STATE.characters[a.charId]; if(ch){ch.owner=a.owner; ch.playerName=a.playerName;} break;}
+    case 'claimchar':{const ch=STATE.characters[a.charId];
+      if(ch){const ownsAlready=Object.values(STATE.characters).some(c=>c.owner===a.owner&&c.id!==a.charId);
+        const lockedByOther=ch.playerName&&ch.playerName!==a.playerName;
+        if(!ownsAlready&&!lockedByOther){ch.owner=a.owner; ch.playerName=a.playerName;}}
+      break;}
+    case 'releasechar':{const ch=STATE.characters[a.charId]; if(ch){ch.owner=''; ch.playerName='';} break;}
     case 'delchar': delete STATE.characters[a.id]; STATE.tokens=STATE.tokens.filter(t=>t.charId!==a.id); break;
     case 'resource':{const ch=STATE.characters[a.id]; if(ch)ch[a.field]=a.value; break;}
     case 'fear': STATE.fear=Math.max(0,Math.min(12,a.value)); break;
@@ -615,7 +610,7 @@ function blankChar(id,name){return{ id,name:name||'New Hero',owner:id,playerName
   agility:0,strength:0,finesse:0,instinct:0,presence:0,knowledge:0,markedTraits:[],
   evasion:10,major:6,severe:13, hp:0,hpmax:6,stress:0,stressmax:6,hope:2,armor:0,armormax:3,
   gold:0,experiences:'',notes:'', subclassTier:1, multiclass:null,
-  loadout:[],vault:[], advances:[],
+  loadout:[],vault:[], advances:[], activeCards:{},
   armorItem:null, primary:null, secondary:null, gear:[] };}
 function makeChar(id,name){STATE.characters[id]=blankChar(id,name);}
 function ensureGMChar(){if(!STATE.characters['gm'])STATE.characters['gm']=Object.assign(blankChar('gm','GM / NPC'),{owner:'gm',hpmax:8});}
@@ -630,9 +625,22 @@ function effStats(ch){
   const gear=[ch.armorItem,ch.primary,ch.secondary,...(ch.gear||[])].filter(Boolean);
   let mEv=0,mMaj=0,mSev=0,mScore=0;
   gear.forEach(e=>{ mEv+=e.evasionMod||0; mMaj+=e.majorMod||0; mSev+=e.severeMod||0; mScore+=e.scoreMod||0; });
+  const ac=ch.activeCards||{};
+  Object.keys(ac).forEach(k=>{const m=ac[k]; if(!m)return;
+    if(!m.auto){mEv+=m.evasionMod||0; mMaj+=m.majorMod||0; mSev+=m.severeMod||0; mScore+=m.scoreMod||0; return;}
+    const nm=k.slice(k.indexOf('|')+1); const fx=CARD_FX[nm]; if(!fx||!fx.mods)return;
+    if(fx.cond==='armored'&&!ch.armorItem)return;
+    if(fx.cond==='unarmored'&&ch.armorItem)return;
+    if(fx.cond==='touch'){const dom=k.slice(0,k.indexOf('|')); if((ch.loadout||[]).filter(x=>x.indexOf(dom+'|')===0).length<4)return;}
+    mEv+=fx.mods.ev||0; mMaj+=fx.mods.maj||0; mSev+=fx.mods.sev||0; mScore+=fx.mods.arm||0;});
+  if(ac['Valor|Rise Up'])mSev+=(ch.proficiency||1);
   let maj,sev,score;
-  if(ch.armorItem){ maj=(ch.level||1)+(ch.armorItem.baseMajor||0); sev=(ch.level||1)+(ch.armorItem.baseSevere||0); score=ch.armorItem.baseScore||0; }
-  else { maj=ch.major||0; sev=ch.severe||0; score=ch.armormax||0; }
+  if(ch.armorItem){
+    maj=(ch.level||1)+(ch.armorItem.baseMajor||0); sev=(ch.level||1)+(ch.armorItem.baseSevere||0); score=ch.armorItem.baseScore||0;
+  } else if(ac['Valor|Bare Bones']){
+    const t=tierOf(ch.level||1);
+    maj=[0,9,11,13,15][t]; sev=[0,19,24,31,35][t]; score=3+(ch.strength||0);
+  } else { maj=ch.major||0; sev=ch.severe||0; score=ch.armormax||0; }
   return { evasion:(ch.evasion||0)+mEv, major:maj+mMaj, severe:sev+mSev, armormax:Math.max(0,score+mScore) };
 }
 
@@ -676,7 +684,7 @@ function renderSheet(){
   wrap.innerHTML=html; syncCharSelects();
 }
 function renderOneSheet(ch){
-  const ed=canEdit(ch), dis=ed?'':'disabled';
+  const ed=canEdit(ch)&&!window.__forceRO, dis=ed?'':'disabled';
   const own=ch.owner===ME.id?' <span class="tag">you</span>':(ch.owner==='gm'?' <span class="tag">GM</span>':' <span class="tag">'+esc((Object.values(STATE.characters).find(c=>c.id===ch.owner)||{}).name||'player')+'</span>');
   const cls=SRD.classes[ch.cls];
   const subOpts=cls?cls.subclasses.map(s=>`<option ${s.name===ch.subclass?'selected':''}>${s.name}</option>`).join(''):'';
@@ -686,6 +694,7 @@ function renderOneSheet(ch){
       <input ${dis} style="font-size:17px;font-weight:600;flex:1" value="${esc(ch.name)}" onchange="editC('${ch.id}','name',this.value)">
       ${own} <span class="tag">Lv ${ch.level}</span> <span class="tag">Prof ${ch.proficiency}</span>
       ${!ed&&ME.peer&&!ME.isHost?`<button class="xs" onclick="claimChar('${ch.id}')" title="make this your character (e.g. after restoring a saved session)">claim</button>`:''}
+      ${ed&&ch.owner===ME.id?`<button class="xs" onclick="releaseChar('${ch.id}')" title="free this character so another player can claim it">release</button>`:''}
       ${ed?`<button class="sm danger" onclick="delChar('${ch.id}')">✕</button>`:''}
     </div>
     <div class="grid3" style="margin-top:8px">
@@ -837,16 +846,105 @@ function featureCards(ch){
 }
 function domainCardHTML(c,ch,ed,where){
   if(!c)return '';
-  const k=cardKey(c).replace(/'/g,"\\'");
+  const fullKey=cardKey(c);
+  const k=fullKey.replace(/'/g,"\\'");
+  const act=(ch.activeCards||{})[fullKey];
   const typeBadge=c.type==='Spell'||c.type==='Grimoire'?'badge spell':'badge feat';
-  return `<div class="gcard"><div class="top"><span class="nm">${esc(c.name)}</span><span class="badge lvl">Lv ${c.level}</span></div>
+  return `<div class="gcard${act?' activeCard':''}"><div class="top"><span class="nm">${esc(c.name)}</span><span>${act?'<span class="badge feat">ACTIVE</span> ':''}<span class="badge lvl">Lv ${c.level}</span></span></div>
     <div class="meta"><span class="badge dom">${esc(c.domain)}</span><span class="${typeBadge}">${esc(c.type||'Ability')}</span><span class="badge">Recall ${c.recall||0}</span></div>
     <div class="txt">${esc(c.text)}</div>
     ${ed?`<div class="acts">
-      ${where==='loadout'?`<button class="xs" onclick="moveCard('${ch.id}','${k}','vault')">→ vault</button>`:`<button class="xs" onclick="moveCard('${ch.id}','${k}','loadout')">→ loadout</button>`}
+      ${where==='loadout'?`<button class="xs ${act?'primary':''}" onclick="toggleCardFx('${ch.id}','${k}')">${act?'⚡ deactivate':'⚡ activate'}</button> <button class="xs" onclick="moveCard('${ch.id}','${k}','vault')">→ vault</button>`:`<button class="xs" onclick="moveCard('${ch.id}','${k}','loadout')">→ loadout</button>`}
       <button class="xs danger" onclick="removeCard('${ch.id}','${k}')">remove</button></div>`:''}
   </div>`;
 }
+/* cards with hardwired RAW effects; everything else gets manual modifiers on activation */
+const CARD_FX={
+  'Bare Bones':{special:'barebones',desc:'unarmored: Armor Score 3+STR, thresholds by tier (RAW, auto)'},
+  'Armorer':{mods:{arm:1},cond:'armored',desc:'+1 Armor Score while wearing armor (auto)'},
+  'Fortified Armor':{mods:{maj:2,sev:2},cond:'armored',desc:'+2 to both thresholds while wearing armor (auto)'},
+  'Frenzy':{mods:{sev:8},desc:'+8 Severe while Frenzied (auto). +10 damage & no Armor Slots — apply those manually'},
+  'Shadowhunter':{mods:{ev:1},desc:'+1 Evasion while in low light/darkness (auto). Attack advantage — set it on the roll'},
+  'Blade-Touched':{mods:{sev:4},cond:'touch',desc:'4+ Blade cards: +4 Severe (auto). The +2 to attack rolls — add as roll mod'},
+  'Splendor-Touched':{mods:{sev:3},cond:'touch',desc:'4+ Splendor cards: +3 Severe (auto)'},
+  'Valor-Touched':{mods:{arm:1},cond:'touch',desc:'4+ Valor cards: +1 Armor Score (auto)'},
+  'Deadly Focus':{mut:{proficiency:1},desc:'+1 Proficiency on the sheet until focus breaks — deactivate to remove'},
+  'Bone-Touched':{mut:{agility:1},cond:'touch',desc:'4+ Bone cards: +1 Agility on the sheet — deactivate to remove'},
+  'Not Good Enough':{roll:true,desc:'damage rolls auto-reroll 1s and 2s (RAW) — rerolled dice show dashed in the tray'},
+  'Rise Up':{special:'riseup',desc:'+Severe equal to your Proficiency (auto, live). The clear-Stress-on-HP part — manual'},
+  'Body Basher':{dmg:true,desc:'melee weapon damage +Strength (auto on 💥 rolls)'},
+  'Cruel Precision':{dmg:true,desc:'weapon damage +max(Finesse, Agility) (auto on 💥 rolls)'},
+  'Voice of Reason':{dmg:true,desc:'when ALL your Stress is marked: +1 Proficiency on damage (auto-detected on 💥 rolls)'},
+  'Arcana-Touched':{spell:1,cond:'touch',desc:'4+ Arcana cards: +1 to Spellcast rolls (auto on 🔮)'},
+  'Sage-Touched':{spell:2,desc:'toggle while in a natural environment: +2 to Spellcast rolls (auto on 🔮)'},
+  'Vitality':{choose:'vitality',desc:'permanent: pick two benefits, card goes to vault'},
+  'Master of the Craft':{choose:'craft',desc:'permanent Experience bonus, card goes to vault'}
+};
+function toggleCardFx(id,key){
+  const ch=copyChar(id); ch.activeCards=ch.activeCards||{};
+  const nm=key.slice(key.indexOf('|')+1); const fx=CARD_FX[nm];
+  if(ch.activeCards[key]){
+    const entry=ch.activeCards[key];
+    if(entry&&entry.mut)Object.keys(entry.mut).forEach(f=>ch[f]=(ch[f]||0)-entry.mut[f]);
+    delete ch.activeCards[key]; dispatch({kind:'upchar',char:ch}); return;
+  }
+  if(fx){
+    if(fx.choose==='vitality'){vitalityModal(id,key);return;}
+    if(fx.choose==='craft'){craftModal(id,key);return;}
+    if(fx.cond==='touch'){const dom=key.slice(0,key.indexOf('|'));
+      if((ch.loadout||[]).filter(x=>x.indexOf(dom+'|')===0).length<4){flash('Needs 4+ '+dom+' cards in your loadout (RAW).');return;}}
+    const entry={auto:true};
+    if(fx.mut){entry.mut=fx.mut; Object.keys(fx.mut).forEach(f=>ch[f]=(ch[f]||0)+fx.mut[f]);}
+    ch.activeCards[key]=entry; dispatch({kind:'upchar',char:ch}); flash(nm+': '+fx.desc); return;
+  }
+  window.__fx={id,key,nm};
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  box.innerHTML='<h3 style="color:var(--gold)">Activate '+esc(nm)+'</h3>'
+   +'<p class="muted" style="font-size:12px">This card has no automatic rules wired in. Enter the static modifiers it grants while active (0 = none).</p>'
+   +'<div class="grid4">'
+   +'<div class="col"><label>Evasion</label><input id="fx-ev" type="number" value="0"></div>'
+   +'<div class="col"><label>Major</label><input id="fx-maj" type="number" value="0"></div>'
+   +'<div class="col"><label>Severe</label><input id="fx-sev" type="number" value="0"></div>'
+   +'<div class="col"><label>Armor</label><input id="fx-arm" type="number" value="0"></div></div>'
+   +'<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="sm" onclick="closeGen()">cancel</button><button class="sm primary" onclick="fxConfirm()">⚡ activate</button></div>';
+  document.getElementById('genModal').classList.add('show');
+}
+function fxConfirm(){const fx=window.__fx; const ch=copyChar(fx.id); ch.activeCards=ch.activeCards||{};
+  ch.activeCards[fx.key]={evasionMod:+val('fx-ev')||0,majorMod:+val('fx-maj')||0,severeMod:+val('fx-sev')||0,scoreMod:+val('fx-arm')||0};
+  dispatch({kind:'upchar',char:ch}); closeGen(); flash(fx.nm+' active');}
+function vitalityModal(id,key){
+  window.__vt={id,key,sel:[]};
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  const opts=[['stress','+1 Stress slot'],['hp','+1 Hit Point slot'],['thr','+2 to both damage thresholds']];
+  box.innerHTML='<h3 style="color:var(--gold)">Vitality — permanent</h3>'
+   +'<p class="muted" style="font-size:12px">Pick <b>two</b> benefits <span class="raw">(RAW)</span>. They apply permanently and the card moves to your vault.</p>'
+   +'<div id="vtlist">'+opts.map(o=>'<div class="opt" data-o="'+o[0]+'" onclick="toggleVt(\''+o[0]+'\')">'+o[1]+'</div>').join('')+'</div>'
+   +'<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="sm" onclick="closeGen()">cancel</button><button class="sm primary" id="vtConfirm" disabled onclick="confirmVt()">apply permanently</button></div>';
+  document.getElementById('genModal').classList.add('show');
+}
+function toggleVt(o){const s=window.__vt.sel; const i=s.indexOf(o); if(i>=0)s.splice(i,1); else{if(s.length>=2){flash('Pick exactly two.');return;} s.push(o);}
+  document.querySelectorAll('#vtlist .opt').forEach(el=>el.classList.toggle('sel',s.includes(el.dataset.o)));
+  document.getElementById('vtConfirm').disabled=(s.length!==2);}
+function confirmVt(){const {id,key,sel}=window.__vt; const ch=copyChar(id);
+  sel.forEach(o=>{if(o==='stress')ch.stressmax=Math.min(12,(ch.stressmax||6)+1);
+    else if(o==='hp')ch.hpmax=Math.min(12,(ch.hpmax||6)+1);
+    else {ch.gear=ch.gear||[]; ch.gear.push({name:'Vitality (permanent)',category:'Permanent',text:'+2 to both damage thresholds — from the Vitality card',evasionMod:0,majorMod:2,severeMod:2,scoreMod:0});}});
+  ch.loadout=ch.loadout.filter(k=>k!==key); if(!ch.vault.includes(key))ch.vault.push(key);
+  dispatch({kind:'upchar',char:ch}); closeGen(); flash('Vitality applied permanently — card vaulted');}
+function craftModal(id,key){
+  window.__cf={id,key};
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  box.innerHTML='<h3 style="color:var(--gold)">Master of the Craft — permanent</h3>'
+   +'<p class="muted" style="font-size:12px">Choose <span class="raw">(RAW)</span>; note it on your Experiences, then the card moves to your vault.</p>'
+   +'<div class="row"><button class="sm primary" onclick="craftApply(\'two\')">+2 to two Experiences</button>'
+   +'<button class="sm primary" onclick="craftApply(\'one\')">+3 to one Experience</button>'
+   +'<button class="sm" onclick="closeGen()">cancel</button></div>';
+  document.getElementById('genModal').classList.add('show');
+}
+function craftApply(mode){const {id,key}=window.__cf; const ch=copyChar(id);
+  ch.experiences=(ch.experiences?ch.experiences+'; ':'')+(mode==='two'?'Master of the Craft: +2 to two chosen Experiences (permanent)':'Master of the Craft: +3 to one chosen Experience (permanent)');
+  ch.loadout=ch.loadout.filter(k=>k!==key); if(!ch.vault.includes(key))ch.vault.push(key);
+  dispatch({kind:'upchar',char:ch}); closeGen(); flash('Applied — card vaulted; edit your Experiences to name which');}
 function pips(ch,field,maxfield,cls,ed){const max=maxfield==='__6'?6:(ch[maxfield]||6); return pipsN(ch,field,max,cls,ed);}
 function pipsN(ch,field,max,cls,ed){const cur=ch[field]||0; let s='';
   for(let i=1;i<=max;i++){const on=i<=cur?'on':''; const cl=ed?`onclick="setPip('${ch.id}','${field}',${i})"`:''; s+=`<div class="pip ${cls} ${on}" ${cl}></div>`;}
@@ -854,16 +952,18 @@ function pipsN(ch,field,max,cls,ed){const cur=ch[field]||0; let s='';
 function setPip(id,field,i){const ch=STATE.characters[id]; if(!ch)return; const v=(ch[field]===i)?i-1:i; dispatch({kind:'resource',id,field,value:Math.max(0,v)});}
 function editC(id,field,val){const ch=copyChar(id); if(!ch)return; ch[field]=val; dispatch({kind:'upchar',char:ch});}
 function setClass(id,val){const ch=copyChar(id); ch.cls=val; ch.subclass=''; dispatch({kind:'upchar',char:ch});}
-function newChar(){openCreator();}
+function newChar(){
+  if(!ME.isHost&&Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release or delete your current character first.');return;}
+  openCreator();}
 function delChar(id){if(confirm('Delete this character?'))dispatch({kind:'delchar',id});}
 function dmg(id){const ch=STATE.characters[id]; if(!ch)return; const eff=effStats(ch); const raw=prompt('Incoming damage (after armor)?'); if(raw===null)return; const d=+raw; if(isNaN(d))return;
   let marks=1,tier='minor'; if(d<=0){marks=0;tier='none';} else if(d>=eff.severe*2){marks=4;tier='MASSIVE';} else if(d>=eff.severe){marks=3;tier='severe';} else if(d>=eff.major){marks=2;tier='major';}
   dispatch({kind:'resource',id,field:'hp',value:Math.min(ch.hpmax,(ch.hp||0)+marks)});
   log(null,ch.name,` takes ${d} damage → ${tier} (mark ${marks} HP).`,true);}
-function moveCard(id,key,to){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key);
+function moveCard(id,key,to){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); if(ch.activeCards)delete ch.activeCards[key];
   if(to==='loadout'){ if(ch.loadout.length>=LOADOUT_MAX){alert('Loadout full ('+LOADOUT_MAX+').');return;} ch.loadout.push(key);} else ch.vault.push(key);
   dispatch({kind:'upchar',char:ch});}
-function removeCard(id,key){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); dispatch({kind:'upchar',char:ch});}
+function removeCard(id,key){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); if(ch.activeCards)delete ch.activeCards[key]; dispatch({kind:'upchar',char:ch});}
 
 function openCardPicker(id,dest){
   const ch=STATE.characters[id]; const doms=accessibleDomains(ch);
@@ -1157,12 +1257,12 @@ function renderParty(){
   let h='<table><tr><th>Name</th><th>HP</th><th>Stress</th><th>Hope</th><th>Eva</th><th>Major</th><th>Severe</th><th></th></tr>';
   pcs.forEach(c=>{const e=effStats(c); const inInit=STATE.initiative.some(x=>x.refId===c.id);
     h+='<tr>'
-    +'<td><b>'+esc(c.name)+'</b> <span class="muted" style="font-size:11px">'+esc(c.cls||'')+' L'+c.level+(c.playerName?' · '+esc(c.playerName):'')+'</span></td>'
+    +'<td><b style="cursor:pointer;border-bottom:1px dotted var(--gold)" title="inspect full sheet (read-only)" onclick="gmInspect(\''+c.id+'\')">'+esc(c.name)+'</b> <span class="muted" style="font-size:11px">'+esc(c.cls||'')+' L'+c.level+(c.playerName?' · '+esc(c.playerName):'')+'</span></td>'
     +'<td>'+stepper(c.id,'hp',c.hp,c.hpmax)+'</td>'
     +'<td>'+stepper(c.id,'stress',c.stress,c.stressmax)+'</td>'
     +'<td>'+stepper(c.id,'hope',c.hope,6)+'</td>'
     +'<td>'+e.evasion+'</td><td>'+e.major+'</td><td>'+e.severe+'</td>'
-    +'<td>'+(ME.isHost?((inInit?'<button class="xs" disabled title="already in initiative">in init</button>':'<button class="xs" onclick="pcToInit(\''+c.id+'\')">→ init</button>')+' <button class="xs danger" title="delete this PC" onclick="delChar(\''+c.id+'\')">✕</button>'):'')+'</td></tr>';});
+    +'<td>'+(ME.isHost?((inInit?'<button class="xs" disabled title="already in initiative">in init</button>':'<button class="xs" onclick="pcToInit(\''+c.id+'\')">→ init</button>')+' '+(c.playerName?'<button class="xs" title="release the claim ('+esc(c.playerName)+')" onclick="releaseChar(\''+c.id+'\')">release</button> ':'')+'<button class="xs danger" title="delete this PC" onclick="delChar(\''+c.id+'\')">✕</button>'):'')+'</td></tr>';});
   box.innerHTML=h+'</table>';
 }
 function stepper(id,field,cur,max){return `<span class="row" style="gap:3px;flex-wrap:nowrap">
@@ -1210,26 +1310,29 @@ function cdDel(id){dispatch({kind:'countdowns',list:STATE.countdowns.filter(c=>c
 
 /* ================= DICE ================= */
 function rollDie(n){return Math.floor(Math.random()*n)+1;}
-function quickDuality(){ syncCharSelects(); rollDuality(); }
-function rollDuality(){
-  const dc=document.getElementById('d-char'); const cid=dc?dc.value:activeCharId(); const ch=STATE.characters[cid];
-  const trait=valOr('d-trait','agility'); const tmod=(trait==='0'||!ch)?0:(ch[trait]||0);
-  const omod=+valOr('d-mod','0')||0; const adv=+valOr('d-adv','0')||0; const exp=document.getElementById('d-exp')&&document.getElementById('d-exp').checked;
-  const diffRaw=valOr('d-diff',''); const diff=diffRaw===''?null:+diffRaw;
-  const hope=rollDie(12),fear=rollDie(12); let advDie=0; if(adv!==0)advDie=rollDie(6)*adv;
-  const expMod=exp?2:0; const total=hope+fear+tmod+omod+advDie+expMod;
+function quickDuality(){ rollDuality(); }
+function rollDuality(cidArg,traitArg,extraMod){
+  const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
+  const cid=cidArg||(mine?mine.id:null);
+  const ch=cid?STATE.characters[cid]:null;
+  const trait=traitArg||'0';
+  const tmod=(trait==='0'||!ch)?0:(ch[trait]||0);
+  const omod=+extraMod||0;
+  const as=window.__advState||0; let advDie=0;
+  if(as){advDie=rollDie(6)*as; window.__advState=0; setTimeout(updateAdvBtns,50);}
+  const hope=rollDie(12),fear=rollDie(12);
+  const total=hope+fear+tmod+omod+advDie;
   let outcome,oclass,hopeDelta=0,fearDelta=0,stressClear=false;
   if(hope===fear){outcome='CRITICAL SUCCESS!';oclass='crit';hopeDelta=1;stressClear=true;}
   else{const withHope=hope>fear;
-    if(diff===null){outcome=withHope?'with HOPE':'with FEAR';oclass=withHope?'hope':'fear'; if(withHope)hopeDelta=1; else fearDelta=1;}
-    else{const success=total>=diff;
-      if(success&&withHope){outcome='Success with HOPE';oclass='hope';hopeDelta=1;}
-      else if(success&&!withHope){outcome='Success with FEAR';oclass='fear';fearDelta=1;}
-      else if(!success&&withHope){outcome='Failure with HOPE';oclass='fail';hopeDelta=1;}
-      else{outcome='Failure with FEAR';oclass='fail';fearDelta=1;}}}
-  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:advDie,total,diff,outcome,oclass,exp};
-  const r=document.getElementById('d-result'); if(r){r.innerHTML=resultHTML(roll,ch,hopeDelta,fearDelta,stressClear); animateDice(r);}
-  const summary=`${outcome} — total ${total}${diff!==null?'/'+diff:''} (Hope ${hope}, Fear ${fear}${exp?', Exp+2':''})`;
+    outcome=withHope?'with HOPE':'with FEAR'; oclass=withHope?'hope':'fear';
+    if(withHope)hopeDelta=1; else fearDelta=1;}
+  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:advDie,total,diff:null,outcome,oclass};
+  const summary=outcome+' — total '+total+' (Hope '+hope+', Fear '+fear
+    +(trait!=='0'&&ch?', '+cap(trait)+' '+(tmod>=0?'+':'')+tmod:'')
+    +(advDie?((advDie>0?', Adv +':', Dis −')+Math.abs(advDie)):'')
+    +(omod?', mod '+(omod>0?'+':'')+omod:'')+')';
+  window.__lastDual={roll:JSON.parse(JSON.stringify(roll)),ctx:{cid:ch?ch.id:null,tmod,omod,hopeDelta,fearDelta,stressClear:!!(stressClear&&ch)}};
   dispatch({kind:'roll', entry:{id:roll.id,who:roll.roller,text:summary,oclass}, roll,
     charId:(ch&&(hopeDelta||stressClear)?ch.id:null), hopeDelta, fearDelta, stressClear:(stressClear&&ch)});
 }
@@ -1266,14 +1369,62 @@ function renderPoolView(){const v=document.getElementById('poolView'); if(!v)ret
   const parts=DIE_TYPES.filter(s=>window.__pool[s]).map(s=>'<span class="pill poolchip" onclick="subDie('+s+')" title="click to remove one">'+window.__pool[s]+'×d'+s+'</span>');
   v.innerHTML=parts.join(' ')||'<span class="muted" style="font-size:12px">click dice to build your roll</span>';}
 function rollPool(){
-  const mod=+val('poolMod')||0;
-  const dice=[]; DIE_TYPES.forEach(s=>{for(let i=0;i<(window.__pool[s]||0);i++)dice.push({s,v:rollDie(s)});});
+  const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
+  const mult=(window.__profMult&&mine)?(mine.proficiency||1):1;
+  const tm=mine?selTraitMod(mine):0;
+  const mod=(+val('poolMod')||0)+tm;
+  const dice=[]; DIE_TYPES.forEach(s=>{for(let i=0;i<(window.__pool[s]||0)*mult;i++)dice.push({s,v:rollDie(s)});});
   if(!dice.length){flash('Add some dice first.');return;}
-  finishPool(ME.name,dice,mod,'');
+  const lbl=[(mult>1?'×'+mult+' Prof':''),(((window.__traitSel||[]).length&&mine)?window.__traitSel.map(t=>cap(t).slice(0,3)).join('+'):'')].filter(Boolean).join(' · ');
+  finishPool(mine?mine.name:ME.name,dice,mod,lbl);
 }
-function rollExpr(roller,label,count,sides,mod){
+function tgTrait(t){const s=window.__traitSel=window.__traitSel||[]; const i=s.indexOf(t); if(i>=0)s.splice(i,1); else s.push(t); renderQuickActions();}
+function selTraitMod(ch){return (window.__traitSel||[]).reduce((a,t)=>a+(ch[t]||0),0);}
+function dualityPool(){
+  const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
+  const tm=mine?selTraitMod(mine):0;
+  rollDuality(mine?mine.id:null,'0',(+val('poolMod')||0)+tm);
+}
+
+function tgAdv(v){window.__advState=(window.__advState===v?0:v); updateAdvBtns();
+  if(window.__advState)flash(window.__advState>0?'Advantage armed: +d6 on your next duality roll':'Disadvantage armed: −d6 on your next duality roll');}
+function updateAdvBtns(){const a=document.getElementById('advBtn'),d=document.getElementById('disBtn');
+  if(a){a.style.background=window.__advState===1?'var(--ok)':''; a.style.color=window.__advState===1?'#08140b':''; a.style.fontWeight=window.__advState===1?'700':'';}
+  if(d){d.style.background=window.__advState===-1?'var(--crimson)':''; d.style.color=window.__advState===-1?'#fff':''; d.style.fontWeight=window.__advState===-1?'700':'';}}
+function qaSpellcast(chId){const ch=STATE.characters[chId]; if(!ch)return;
+  const cls=SRD.classes[ch.cls]; const sub=cls?cls.subclasses.find(s=>s.name===ch.subclass):null;
+  const trait=(sub&&sub.spellcast?sub.spellcast:'').toLowerCase(); if(!trait){flash('No Spellcast trait — this subclass does not cast.');return;}
+  const ac=ch.activeCards||{}; let mod=0;
+  if(ac['Arcana|Arcana-Touched']&&(ch.loadout||[]).filter(k=>k.indexOf('Arcana|')===0).length>=4)mod+=1;
+  if(ac['Sage|Sage-Touched'])mod+=2;
+  rollDuality(chId,trait,mod);
+}
+
+function rerollDual(which){
+  const L=window.__lastDual; if(!L||!L.roll)return;
+  const o=L.roll, c=L.ctx;
+  const hope=which==='hope'?rollDie(12):o.hope;
+  const fear=which==='fear'?rollDie(12):o.fear;
+  const total=hope+fear+(c.tmod||0)+(c.omod||0)+(o.adv||0);
+  let outcome,oclass,hd=0,fd=0,sc=false;
+  if(hope===fear){outcome='CRITICAL SUCCESS!';oclass='crit';hd=1;sc=true;}
+  else{const wh=hope>fear; outcome=wh?'with HOPE':'with FEAR'; oclass=wh?'hope':'fear'; if(wh)hd=1; else fd=1;}
+  const ch=c.cid?STATE.characters[c.cid]:null;
+  const roll={id:rid(6),roller:o.roller,hope,fear,adv:o.adv||0,total,diff:null,outcome,oclass};
+  const summary='↻ rerolled the '+which+' die: '+outcome+' — total '+total+' (Hope '+hope+', Fear '+fear+')';
+  const dH=hd-(c.hopeDelta||0), dF=fd-(c.fearDelta||0), dS=sc&&!c.stressClear;
+  window.__lastDual={roll:JSON.parse(JSON.stringify(roll)),ctx:{...c,hopeDelta:hd,fearDelta:fd,stressClear:sc}};
+  dispatch({kind:'roll',entry:{id:roll.id,who:o.roller,text:summary,oclass},roll,
+    charId:(ch?ch.id:null),hopeDelta:dH,fearDelta:dF,stressClear:(dS&&ch)});
+}
+
+function rollExpr(roller,label,count,sides,mod,chId){
   count=Math.max(1,Math.min(40,+count||1));
   const dice=[]; for(let i=0;i<count;i++)dice.push({s:+sides,v:rollDie(+sides)});
+  if(chId){const ch=STATE.characters[chId]; // Not Good Enough (Blade L1, RAW): reroll 1s and 2s on damage dice
+    if(ch&&ch.activeCards&&ch.activeCards['Blade|Not Good Enough']){
+      dice.forEach(d=>{ if(d.v<=2){d.old=d.v; d.v=rollDie(d.s); d.r=true;} });
+    }}
   finishPool(roller,dice,+mod||0,label);
 }
 function finishPool(roller,dice,mod,label){
@@ -1284,13 +1435,27 @@ function finishPool(roller,dice,mod,label){
 }
 function physAnimate(tray){
   [...tray.children].forEach((el,i)=>{
-    const fin=el.dataset.final, sides=+el.dataset.sides||6;
+    const fin=el.dataset.final, old=el.dataset.old, sides=+el.dataset.sides||6;
     const dx=-(220+Math.random()*200), dy=-40+Math.random()*80, rot=-(540+Math.random()*540);
     try{el.animate([{transform:'translate('+dx+'px,'+dy+'px) rotate('+rot+'deg)',opacity:.35},
       {transform:'translate(0,0) rotate('+(Math.random()*14-7)+'deg)',opacity:1}],
       {duration:650+Math.random()*450+i*50,easing:'cubic-bezier(.18,.85,.3,1.1)'});}catch(e){}
     let t2=0; const iv=setInterval(()=>{el.textContent=1+Math.floor(Math.random()*sides); t2+=70;
-      if(t2>=620+i*30){clearInterval(iv); el.textContent=fin; el.classList.add('settle'); setTimeout(()=>el.classList.remove('settle'),400);}},70);
+      if(t2>=620+i*30){clearInterval(iv);
+        el.textContent=old||fin; el.classList.add('settle'); setTimeout(()=>el.classList.remove('settle'),350);
+        if(old){ // Not Good Enough: show the bad roll, then visibly reroll
+          el.style.filter='brightness(1.5) saturate(1.8)';
+          setTimeout(()=>{
+            el.style.filter='';
+            try{el.animate([{transform:'translateY(0) rotate(0deg)'},
+              {transform:'translateY(-28px) rotate(220deg)',offset:.45},
+              {transform:'translateY(0) rotate(360deg)'}],{duration:540,easing:'cubic-bezier(.3,.7,.3,1.1)'});}catch(e){}
+            let t3=0; const iv2=setInterval(()=>{el.textContent=1+Math.floor(Math.random()*sides); t3+=65;
+              if(t3>=455){clearInterval(iv2); el.textContent=fin; el.classList.add('settle'); setTimeout(()=>el.classList.remove('settle'),400);
+                el.style.outline='2px dashed #e9c45a'; el.title='Not Good Enough — rerolled (was '+old+')';}},65);
+          },700);
+        }
+      }},70);
   });
 }
 function findDice(text,ch){
@@ -1298,26 +1463,51 @@ function findDice(text,ch){
   let count=m[1]?+m[1]:((/proficiency/i.test(text)&&ch)?(ch.proficiency||1):1);
   return {count:Math.max(1,count), sides:+m[2], mod:m[3]?+m[3].replace(/\s/g,''):0};
 }
-function qaAttack(chId,trait){ setVal('d-char',chId); setVal('d-trait',trait); rollDuality(); }
+function qaAttack(chId,trait){ rollDuality(chId,trait); }
 function qbtn(fn,icon,label){return '<button class="sm" onclick="'+fn+'">'+icon+' '+label+'</button>';}
+function weaponDmg(ch,slot){
+  const w=ch[slot]; if(!w)return null;
+  const m=String(w.damageDice||'d6').match(/(\d*)d(\d+)/i); const per=+((m&&m[1])||1), sides=+((m&&m[2])||6);
+  const ac=ch.activeCards||{}; let prof=ch.proficiency||1; let mod=w.damageBonus||0; const tags=[];
+  if(ac['Splendor|Voice of Reason']&&(ch.stress||0)>=(ch.stressmax||6)){prof+=1;tags.push('Voice of Reason +1 prof');}
+  if(ac['Valor|Body Basher']&&w.range==='Melee'&&(ch.strength||0)){mod+=ch.strength;tags.push('Body Basher +'+ch.strength);}
+  if(ac['Bone|Cruel Precision']){const b=Math.max(ch.finesse||0,ch.agility||0); if(b>0){mod+=b;tags.push('Cruel Precision +'+b);}}
+  return {count:per*prof,sides,mod,tags,name:w.name};
+}
+function rollWeaponDmg(chId,slot){
+  const ch=STATE.characters[chId]; if(!ch)return; const d=weaponDmg(ch,slot); if(!d)return;
+  const dice=[]; for(let i=0;i<Math.min(40,d.count);i++)dice.push({s:d.sides,v:rollDie(d.sides)});
+  if(ch.activeCards&&ch.activeCards['Blade|Not Good Enough'])dice.forEach(x=>{if(x.v<=2){x.old=x.v;x.v=rollDie(x.s);x.r=true;}});
+  finishPool(ch.name,dice,d.mod,d.name+' damage'+(d.tags.length?' · '+d.tags.join(', '):''));
+}
+
 function renderQuickActions(){
   const box=document.getElementById('qaList'); if(!box)return;
   buildDieShelf(); renderPoolView();
+  const mineC=Object.values(STATE.characters).find(c=>c.owner===ME.id);
+  const tc=document.getElementById('traitChips');
+  if(tc){ window.__traitSel=window.__traitSel||[];
+    tc.innerHTML = mineC ? TRAITS.map(t=>'<button class="xs '+(window.__traitSel.includes(t)?'primary':'')+'" onclick="tgTrait(\''+t+'\')" title="add '+cap(t)+' as a modifier">'+cap(t).slice(0,3)+' '+(mineC[t]>=0?'+':'')+mineC[t]+'</button>').join(' ')
+      +' <button class="xs '+(window.__profMult?'primary':'')+'" onclick="window.__profMult=!window.__profMult;renderQuickActions()" title="multiply pool dice count by your Proficiency">×Prof '+(mineC.proficiency||1)+'</button>'
+    : '<span class="muted" style="font-size:11px">no character — flat rolls only</span>'; }
   const q=s=>String(s).replace(/\\/g,'').replace(/'/g,"\\'");
   let h='';
   Object.values(STATE.characters).filter(c=>c.owner===ME.id).forEach(ch=>{
+    const nge=!!(ch.activeCards&&ch.activeCards['Blade|Not Good Enough']);
     let btns=[];
-    [ch.primary,ch.secondary].forEach(w=>{ if(!w)return;
+    ['primary','secondary'].forEach(slot=>{const w=ch[slot]; if(!w)return;
       const trait=(w.trait||'agility').toLowerCase();
       btns.push(qbtn("qaAttack('"+ch.id+"','"+trait+"')",'⚔',esc(w.name)+' attack ('+esc(w.trait||'')+')'));
-      const m=String(w.damageDice||'d6').match(/(\d*)d(\d+)/i); const per=+((m&&m[1])||1), sides=+((m&&m[2])||6);
-      const n=per*(ch.proficiency||1);
-      btns.push(qbtn("rollExpr('"+q(ch.name)+"','"+q(w.name)+" damage',"+n+","+sides+","+(w.damageBonus||0)+")",'💥',esc(w.name)+' dmg '+n+'d'+sides+(w.damageBonus?'+'+w.damageBonus:'')));
+      const d=weaponDmg(ch,slot);
+      btns.push(qbtn("rollWeaponDmg('"+ch.id+"','"+slot+"')",'💥',(nge?'⚡ ':'')+esc(w.name)+' dmg '+d.count+'d'+d.sides+(d.mod?((d.mod>0?'+':'')+d.mod):'')+(d.tags.length?' ✦':'')));
     });
+    const clsD=SRD.classes[ch.cls]; const subD=clsD?clsD.subclasses.find(s=>s.name===ch.subclass):null;
+    if(subD&&subD.spellcast)btns.push(qbtn("qaSpellcast('"+ch.id+"')",'🔮','Spellcast ('+esc(subD.spellcast)+')'));
     (ch.gear||[]).forEach(it=>{const dm=findDice(it.text||''); if(dm)
       btns.push(qbtn("rollExpr('"+q(ch.name)+"','"+q(it.name)+"',"+dm.count+","+dm.sides+","+dm.mod+")",'🧪',esc(it.name)+' '+dm.count+'d'+dm.sides+(dm.mod?((dm.mod>0?'+':'')+dm.mod):'')));});
-    (ch.loadout||[]).forEach(k=>{const c=findCard(k); if(!c)return; const dm=findDice(c.text||'',ch); if(dm)
-      btns.push(qbtn("rollExpr('"+q(ch.name)+"','"+q(c.name)+"',"+dm.count+","+dm.sides+","+dm.mod+")",'✨',esc(c.name)+' '+dm.count+'d'+dm.sides+(dm.mod?((dm.mod>0?'+':'')+dm.mod):'')));});
+    (ch.loadout||[]).forEach(k=>{const c=findCard(k); if(!c)return; const dm=findDice(c.text||'',ch); if(dm){
+      const isDmg=/damage/i.test(c.text||'');
+      btns.push(qbtn("rollExpr('"+q(ch.name)+"','"+q(c.name)+"',"+dm.count+","+dm.sides+","+dm.mod+(isDmg?(",'"+ch.id+"'"):"")+")",'✨',esc(c.name)+' '+dm.count+'d'+dm.sides+(dm.mod?((dm.mod>0?'+':'')+dm.mod):'')));}});
     if(btns.length)h+='<div style="margin-bottom:8px"><div class="muted" style="font-size:11px">'+esc(ch.name)+'</div><div class="row">'+btns.join(' ')+'</div></div>';
   });
   if(ME.isHost&&STATE.encounter.length){
@@ -1341,22 +1531,33 @@ function buildQuickDice(){const q=document.getElementById('quickdice'); if(!q)re
 function showRollToast(roll){
   const t=document.getElementById('rolltoast');
   if(roll.kind==='pool'){
+    const rr=(roll.dice||[]).filter(d=>d.r).length;
+    const ds=(roll.dice||[]).reduce((a,d)=>a+d.v,0);
     t.innerHTML='<div class="roller">'+esc(roll.roller)+' rolls '+esc((roll.label?roll.label+' — ':'')+(roll.desc||''))+'</div>'
      +'<div class="row" id="trayDice" style="gap:8px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto"></div>'
-     +'<div class="outcome crit" style="margin-top:8px">= '+roll.total+'</div>';
+     +'<div style="margin-top:8px;font-family:Georgia,serif"><span class="muted" style="font-size:16px">'+ds+(roll.mod?' '+(roll.mod>0?'+ ':'− ')+Math.abs(roll.mod):'')+' = </span><span style="font-size:32px;font-weight:700;color:var(--gold);text-shadow:0 0 8px rgba(214,166,74,.4)">'+roll.total+'</span></div>'
+     +(rr?'<div class="muted" style="font-size:11px">⚡ Not Good Enough rerolled '+rr+' (1s &amp; 2s, dashed)</div>':'');
     const tray=t.querySelector('#trayDice');
-    (roll.dice||[]).forEach(d=>{const el=document.createElement('div'); el.className='diephys shape'+d.s; el.dataset.final=d.v; el.dataset.sides=d.s; el.textContent=d.v; tray.appendChild(el);});
+    (roll.dice||[]).forEach(d=>{const el=document.createElement('div'); el.className='diephys shape'+d.s; el.dataset.final=d.v; el.dataset.sides=d.s; if(d.r)el.dataset.old=d.old; el.textContent=d.v;
+      tray.appendChild(el);});
     t.classList.add('show'); physAnimate(tray);
   } else {
     t.innerHTML='<div class="roller">'+esc(roll.roller)+' rolls…</div>'
      +'<div class="row" style="gap:12px;align-items:flex-end;justify-content:center">'
      +'<div class="diewrap"><span class="dl hope">Hope</span><div class="die hope">'+roll.hope+'</div></div>'
      +'<div class="diewrap"><span class="dl fear">Fear</span><div class="die fear">'+roll.fear+'</div></div>'
-     +(roll.adv?('<div class="diewrap"><span class="dl">d6</span><div class="die adv">'+Math.abs(roll.adv)+'</div></div>'):'')
-     +'</div><div class="outcome '+roll.oclass+'">'+roll.outcome+'</div><div class="muted">total '+roll.total+((roll.diff!==null&&roll.diff!==undefined)?' / '+roll.diff:'')+'</div>';
+     +(roll.adv?('<div class="diewrap"><span class="dl" style="color:'+(roll.adv>0?'#8fd8a0':'#e8a39c')+'">'+(roll.adv>0?'▲ Adv':'▼ Dis')+'</span><div class="die adv"'+(roll.adv<0?' style="border-color:var(--crimson);color:#e8a39c;background:#240f0f"':'')+'>'+Math.abs(roll.adv)+'</div></div>'):'')
+     +'</div><div class="outcome '+roll.oclass+'">'+roll.outcome+'</div>'
+     +(function(){const dm=roll.total-roll.hope-roll.fear-(roll.adv||0);
+       return '<div style="font-family:Georgia,serif"><span class="muted" style="font-size:16px">'+roll.hope+' + '+roll.fear+(roll.adv?' '+(roll.adv>0?'+ ':'− ')+Math.abs(roll.adv):'')+(dm?' '+(dm>0?'+ ':'− ')+Math.abs(dm):'')+' = </span><span style="font-size:32px;font-weight:700;color:var(--gold);text-shadow:0 0 8px rgba(214,166,74,.4)">'+roll.total+'</span>'+((roll.diff!==null&&roll.diff!==undefined)?'<span class="muted" style="font-size:14px"> vs '+roll.diff+'</span>':'')+'</div>';})();
+    if(window.__lastDual&&window.__lastDual.roll&&window.__lastDual.roll.id===roll.id){
+      t.innerHTML+='<div class="row" style="justify-content:center;gap:6px;margin-top:6px">'
+       +'<button class="xs" onclick="rerollDual(\'hope\')" title="Endless Charisma / Reassurance / Support Tank — pay the card cost yourself">↻ reroll Hope die</button>'
+       +'<button class="xs" onclick="rerollDual(\'fear\')">↻ reroll Fear die</button></div>';
+    }
     t.classList.add('show'); animateDice(t);
   }
-  clearTimeout(window.__toastT); window.__toastT=setTimeout(()=>t.classList.remove('show'),roll.kind==='pool'?4800:4200);
+  clearTimeout(window.__toastT); window.__toastT=setTimeout(()=>t.classList.remove('show'),roll.kind==='pool'?(((roll.dice||[]).some(d=>d.r))?7000:4800):((window.__lastDual&&window.__lastDual.roll&&window.__lastDual.roll.id===roll.id)?8000:4200));
 }
 
 /* ================= LOG ================= */
@@ -1503,14 +1704,19 @@ function openWelcome(){
   const box=document.getElementById('genBox'); box.classList.remove('wide');
   const pcs=Object.values(STATE.characters);
   box.innerHTML='<h3 style="color:var(--gold)">Welcome, '+esc(ME.name)+'</h3>'
-   +'<p class="muted" style="font-size:12px">Claim an existing character or create a new one.</p>'
-   +(pcs.length?'<div style="max-height:40vh;overflow:auto">'+pcs.map(c=>
-      '<div class="opt" onclick="welcomeClaim(\''+c.id+'\')"><div><b style="color:var(--gold)">'+esc(c.name)+'</b> <span class="tag">'+esc(c.cls||'no class')+' L'+c.level+'</span>'
-      +(c.playerName?'<div class="muted" style="font-size:11px">player: '+esc(c.playerName)+'</div>':'')+'</div></div>').join('')+'</div>':'<p class="muted">No characters on this table yet.</p>')
-   +'<div class="row" style="margin-top:10px;justify-content:space-between"><button class="sm" onclick="closeGen()">later</button><button class="sm primary" onclick="openCreator()">+ Create new character</button></div>';
+   +'<p class="muted" style="font-size:12px">Claim a free character or create a new one. One hero per player.</p>'
+   +(pcs.length?'<div style="max-height:40vh;overflow:auto">'+pcs.map(c=>{
+      const locked=c.playerName&&c.playerName!==ME.name;
+      return '<div class="opt'+(locked?' dis':'')+'" onclick="welcomeClaim(\''+c.id+'\')"><div><b style="color:var(--gold)">'+esc(c.name)+'</b> <span class="tag">'+esc(c.cls||'no class')+' L'+c.level+'</span>'
+      +(c.playerName?'<div class="muted" style="font-size:11px">'+(locked?'🔒 claimed by ':'player: ')+esc(c.playerName)+'</div>':'<div class="muted" style="font-size:11px">free to claim</div>')+'</div></div>';}).join('')+'</div>':'<p class="muted">No characters on this table yet.</p>')
+   +'<div class="row" style="margin-top:10px;justify-content:space-between"><button class="sm" onclick="closeGen()">later</button><button class="sm primary" onclick="closeGen();newChar()">+ Create new character</button></div>';
   document.getElementById('genModal').classList.add('show');
 }
-function welcomeClaim(id){dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name}); closeGen(); flash('Character claimed');}
+function welcomeClaim(id){
+  const ch=STATE.characters[id]; if(!ch)return;
+  if(Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release yours first.');return;}
+  if(ch.playerName&&ch.playerName!==ME.name){flash('Claimed by '+ch.playerName+' — they must release it first.');return;}
+  dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name}); closeGen(); flash('Character claimed');}
 function openCreator(){
   window.__cc={step:1,d:{name:(ME.name||'New')+"'s hero",ancestry:'',community:'',cls:'',subclass:'',
     traits:{agility:'',strength:'',finesse:'',instinct:'',presence:'',knowledge:''},
@@ -1639,6 +1845,7 @@ if(!ccTraitCheck()){flash('Pick four different traits.');return;}
   cc.step+=dir; ccRender();
 }
 function ccFinish(){
+  if(!ME.isHost&&Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release yours first.');closeGen();return;}
   const d=window.__cc.d; const cls=SRD.classes[d.cls];
   const id=ME.id+'-'+rid(3); const ch=blankChar(id,d.name);
   ch.owner=ME.id; ch.playerName=ME.name;
@@ -1720,6 +1927,26 @@ function renderEbList(){const box=document.getElementById('ebList'); if(!box)ret
   box.innerHTML=all.length?all.map(p=>'<span class="pill" style="margin:2px"><b>'+esc(p[1].name)+'</b> <span class="muted" style="font-size:10px">T'+(p[1].tier||1)+' '+p[0]+'</span> <button class="xs danger" onclick="ebDel(\''+p[0]+'\',\''+p[1].id+'\')">✕</button></span>').join(' ')
    :'<span class="muted" style="font-size:12px">No custom gear yet — saved gear appears in every player\'s equip picker.</span>';}
 
+function openRoom(){
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  const code=document.getElementById('roomCode').textContent;
+  const pres=STATE.presence||[];
+  box.innerHTML='<h3 style="color:var(--gold)">Room '+esc(code)+'</h3>'
+   +'<div class="row" style="margin:6px 0"><button class="sm" onclick="copyRoom()">copy code</button><span class="muted" style="font-size:12px">share it so friends can join</span></div>'
+   +'<h4>At the table ('+pres.length+')</h4>'
+   +(pres.length?pres.map(p=>{const ch=p.role!=='GM'?Object.values(STATE.characters).find(c=>c.playerName===p.name):null;
+      return '<div class="opt" style="cursor:default"><div><b style="color:var(--gold)">'+esc(p.name)+'</b> <span class="tag">'+esc(p.role)+'</span>'
+      +(ch?'<div class="muted" style="font-size:11px">playing '+esc(ch.name)+' ('+esc(ch.cls||'no class')+' L'+ch.level+')</div>':'')+'</div></div>';}).join(''):'<p class="muted" style="font-size:12px">Nobody connected yet.</p>')
+   +'<div class="row" style="margin-top:8px;justify-content:flex-end"><button class="sm" onclick="closeGen()">close</button></div>';
+  document.getElementById('genModal').classList.add('show');
+}
+function gmInspect(id){const ch=STATE.characters[id]; if(!ch)return;
+  window.__forceRO=true; let html=''; try{html=renderOneSheet(ch);}finally{window.__forceRO=false;}
+  const box=document.getElementById('genBox'); box.classList.add('wide');
+  box.innerHTML='<div class="row" style="justify-content:space-between"><h3 style="color:var(--gold);margin:0">Inspect — '+esc(ch.name)+' <span class="muted" style="font-size:12px">read-only</span></h3><button class="sm" onclick="closeGen()">close</button></div>'+html;
+  document.getElementById('genModal').classList.add('show');
+}
+
 function saveSession(){
   const data=JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE},null,1);
   const blob=new Blob([data],{type:'application/json'});
@@ -1735,7 +1962,7 @@ function loadSession(){
     rd.onload=()=>{try{
       const data=JSON.parse(rd.result); const st=data.state||data;
       if(!st.characters||!st.grid){alert('Not a valid HellHeart session file.');return;}
-      STATE=st; if(STATE.lastRoll)shownRoll=STATE.lastRoll.id;
+      const pres=STATE.presence; STATE=st; STATE.presence=pres||[]; if(STATE.lastRoll)shownRoll=STATE.lastRoll.id;
       if(ME.isHost)broadcast(); else refreshAll();
       flash('Session loaded'+(data.saved?' ('+data.saved.slice(0,10)+')':''));
     }catch(e){alert('Could not read file: '+e.message);}};
@@ -1745,6 +1972,8 @@ function loadSession(){
 let __lastSave=0;
 function autosave(){const now=Date.now(); if(now-__lastSave<2000)return; __lastSave=now;
   try{localStorage.setItem('hellheart-session',JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE}));}catch(e){}}
+function releaseChar(id){if(!confirm('Release this character so another player can claim it?'))return;
+  dispatch({kind:'releasechar',charId:id}); flash('Character released');}
 function claimChar(id){if(confirm('Claim this character as yours?'))dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name});}
 function boot(){
   ME.id='solo-'+rid(4); ME.name='You';
