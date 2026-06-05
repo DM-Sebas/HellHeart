@@ -65,7 +65,7 @@
   #mapstage{position:relative;margin:36px}
   #grid{display:grid;position:relative;background:var(--grid);border:1px solid var(--line)}
   .cell{border:1px solid rgba(255,255,255,.05)}
-  #edges,#edgehot,#tokens{position:absolute;inset:0;pointer-events:none}
+  #edges,#edgehot,#ink,#tokens{position:absolute;inset:0;pointer-events:none}
   .wall{position:absolute;background:#cfc6b5;border-radius:2px;box-shadow:0 0 3px #000}
   .door{position:absolute;background:#c8862e;border-radius:2px;box-shadow:0 0 3px #000}
   .ehot{position:absolute;pointer-events:auto;cursor:pointer;background:transparent}
@@ -231,8 +231,11 @@
       <select id="mapmode" onchange="setMapMode(this.value)">
         <option value="paint">Paint terrain</option>
         <option value="edges">Walls / Doors</option>
+        <option value="draw">Draw (pen)</option>
+        <option value="erase-stroke">Eraser (stroke)</option>
         <option value="off">View / move only</option>
       </select>
+      <input type="color" id="penColor" title="your pen color" style="display:none;width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none">
       <select id="scaleSel" class="gmonly" onchange="setScale(+this.value)" title="feet per square (affects range rings)">
         <option value="5">5 ft/sq</option><option value="10">10 ft/sq</option><option value="20">20 ft/sq</option>
       </select>
@@ -246,7 +249,7 @@
     <div id="mapbody">
       <div id="mapviewport">
         <div id="mapwrap"><div id="mapstage">
-          <div id="grid"></div><div id="edges"></div><div id="edgehot"></div><div id="tokens"></div>
+          <div id="grid"></div><div id="edges"></div><div id="edgehot"></div><div id="ink"></div><div id="tokens"></div>
         </div></div>
         <button class="expand t gmonly sm" onclick="expandGrid('top')">▲ double</button>
         <button class="expand b gmonly sm" onclick="expandGrid('bottom')">▼ double</button>
@@ -254,10 +257,11 @@
         <button class="expand r gmonly sm" onclick="expandGrid('right')">▶ double</button>
       </div>
       <div id="initpanel">
-        <div class="hd">Initiative
-          <span><button class="xs" onclick="initImportParty()" title="add all PCs">+PCs</button>
-          <button class="xs" onclick="initAddRow()">+row</button>
-          <button class="xs danger" onclick="initClear()">clear</button></span></div>
+        <div class="hd">Initiative <span class="tag" id="roundTag">Round 1</span>
+          <span><button class="xs primary gmonly" onclick="nextTurn()" title="finish this turn — spotlight the next (new round when it wraps)">▶ next</button>
+          <button class="xs gmonly" onclick="initImportParty()" title="add all PCs">+PCs</button>
+          <button class="xs gmonly" onclick="initAddRow()">+row</button>
+          <button class="xs danger gmonly" onclick="initClear()">clear</button></span></div>
         <div id="initlist"></div>
         <div class="muted" style="font-size:10px;padding:6px;border-top:1px solid var(--line)">
           <span class="hb">Homebrew helper</span> — Daggerheart is spotlight-based (no fixed initiative RAW). Use this only if your table likes turn order.</div>
@@ -408,6 +412,10 @@
 
   <!-- DICE -->
   <div class="panel scroll" id="panel-dice" data-pane="dice" data-label="Dice">
+    <div class="card" style="padding:6px 10px"><div class="row" style="align-items:center">
+      <b style="font-size:12px">🛡 Save:</b><span id="saveBtns" class="row" style="gap:4px"></span>
+      <span class="muted" style="font-size:10px;margin-left:auto">duality + trait · reaction, no Hope/Fear (RAW)</span>
+    </div></div>
     <div class="card"><h4>Dice Pool</h4>
       <div class="row" id="dieShelf"></div>
       <div class="row" id="traitChips" style="margin-top:6px"></div>
@@ -490,8 +498,8 @@ function terrainStyle(id){
   const t=TERRAIN_MAP[id]; return t?('background:'+t.color):'';
 }
 
-let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], characters:{}, fear:0,
-  npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], log:[], lastRoll:null };
+let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strokes:[], characters:{}, fear:0,
+  npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], initRound:1, log:[], lastRoll:null };
 let ME={ id:null, name:'', isHost:false, role:'player', peer:null, conns:[], hostConn:null };
 let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=null, stepQueue=[], stepCtx=null, npcEditId=null, activeTab=null;
 
@@ -569,8 +577,10 @@ function apply(a){
     case 'paint': a.cells.forEach(({r,c,id})=>{const k=r+','+c; if(id==='erase')delete STATE.tiles[k]; else STATE.tiles[k]=id;}); break;
     case 'cleartiles': STATE.tiles={}; break;
     case 'edge': if(a.val)STATE.edges[a.key]=a.val; else delete STATE.edges[a.key]; break;
-    case 'mapset': STATE.grid=a.grid; STATE.tiles=a.tiles; STATE.edges=a.edges; STATE.tokens=a.tokens; break;
+    case 'mapset': STATE.grid=a.grid; STATE.tiles=a.tiles; STATE.edges=a.edges; STATE.tokens=a.tokens; if(a.strokes)STATE.strokes=a.strokes; break;
     case 'addtoken': STATE.tokens.push(a.token); break;
+    case 'stroke': (STATE.strokes||(STATE.strokes=[])).push(a.stroke); if(STATE.strokes.length>500)STATE.strokes.shift(); break;
+    case 'delstroke': STATE.strokes=(STATE.strokes||[]).filter(s=>s.id!==a.id); break;
     case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;} break;}
     case 'deltoken': STATE.tokens=STATE.tokens.filter(t=>t.id!==a.id); break;
     case 'upchar':{const isNew=!STATE.characters[a.char.id];
@@ -590,6 +600,12 @@ function apply(a){
     case 'npclib': STATE.npcLibrary=a.list; break;
     case 'encounter': STATE.encounter=a.list; break;
     case 'initiative': STATE.initiative=a.list; break;
+    case 'initnext':{const l=STATE.initiative; if(!l.length)break;
+      const i=l.findIndex(x=>x.act); l.forEach(x=>x.act=false);
+      let j=(i<0?0:i+1);
+      if(j>=l.length){j=0; STATE.initRound=(STATE.initRound||1)+1;}
+      l[j].act=true; break;}
+    case 'initround': STATE.initRound=Math.max(1,a.n||1); break;
     case 'countdowns': STATE.countdowns=a.list; break;
     case 'envfeat': STATE.envFeatures=a.list; break;
     case 'customgear': STATE.customGear=a.gear; break;
@@ -1074,7 +1090,7 @@ function filterPickerWork(){const {pool}=window.__pickerW; const q=(document.get
 function pickCardWork(idx){const c=window.__pickerW.pool[idx]; const key=cardKey(c); if(work.loadout.length<LOADOUT_MAX)work.loadout.push(key); else work.vault.push(key); closeGen(); processStep();}
 
 /* ================= MAP ================= */
-function setMapMode(m){mapMode=m; document.getElementById('edgehint').style.display=m==='edges'?'':'none'; buildPalette(); renderMap();}
+function setMapMode(m){mapMode=m; document.getElementById('edgehint').style.display=m==='edges'?'':'none'; const pc=document.getElementById('penColor'); if(pc)pc.style.display=(m==='draw')?'':'none'; buildPalette(); renderMap();}
 function buildPalette(){
   const sel=document.getElementById('terrainSel'), chip=document.getElementById('terrainChip'); if(!sel)return;
   const paint=mapMode==='paint';
@@ -1088,12 +1104,12 @@ function buildPalette(){
   chip.style.cssText='width:18px;height:18px;border-radius:4px;border:1px solid var(--line);display:inline-block;flex:0 0 auto;'+(selectedTerrain==='erase'?'background:transparent':terrainStyle(selectedTerrain));
 }
 function selTerrain(v){selectedTerrain=v;buildPalette();}
-function renderMap(){ renderGrid(); renderEdges(); renderTokens(); }
+function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; renderGrid(); renderEdges(); renderStrokes(); renderTokens(); }
 function renderGrid(){
   const g=document.getElementById('grid'); if(!g)return; const {cols,rows,cell}=STATE.grid;
   g.style.gridTemplateColumns=`repeat(${cols},${cell}px)`; g.style.gridTemplateRows=`repeat(${rows},${cell}px)`;
   g.style.width=(cols*cell)+'px'; g.style.height=(rows*cell)+'px';
-  ['edges','edgehot','tokens'].forEach(idn=>{const e=document.getElementById(idn); if(e){e.style.width=(cols*cell)+'px'; e.style.height=(rows*cell)+'px';}});
+  ['edges','edgehot','ink','tokens'].forEach(idn=>{const e=document.getElementById(idn); if(e){e.style.width=(cols*cell)+'px'; e.style.height=(rows*cell)+'px';}});
   let html=''; for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const id=STATE.tiles[r+','+c]; html+=`<div class="cell" data-r="${r}" data-c="${c}" style="${id?terrainStyle(id):''}"></div>`;}
   g.innerHTML=html;
   const sc=document.getElementById('scaleSel'); if(sc)sc.value=String(STATE.grid.scale||5);
@@ -1142,13 +1158,71 @@ function makeDraggable(el,t){
     if(window.__tap&&window.__tap.id===t.id&&now-window.__tap.ts<400){window.__tap=null;
       window.__ringToken=(window.__ringToken===t.id?null:t.id); renderTokens(); return;}
     window.__tap={id:t.id,ts:now};
-    const {cell}=STATE.grid; const stage=document.getElementById('mapstage').getBoundingClientRect();
+    const {cell}=STATE.grid;
+    window.__dragging=true;
     el.classList.add('dragging'); el.setPointerCapture(e.pointerId);
-    function mv(ev){el.style.left=(ev.clientX-stage.left-cell/2)+'px'; el.style.top=(ev.clientY-stage.top-cell/2)+'px';}
+    const rect=()=>document.getElementById('mapstage').getBoundingClientRect();
+    function mv(ev){const r=rect(); el.style.left=(ev.clientX-r.left-cell/2)+'px'; el.style.top=(ev.clientY-r.top-cell/2)+'px';}
     function up(ev){el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); el.classList.remove('dragging');
-      let c=Math.round((ev.clientX-stage.left-cell/2)/cell), r=Math.round((ev.clientY-stage.top-cell/2)/cell);
-      c=Math.max(0,Math.min(STATE.grid.cols-1,c)); r=Math.max(0,Math.min(STATE.grid.rows-1,r)); dispatch({kind:'movetoken',id:t.id,r,c});}
+      window.__dragging=false;
+      const r=rect();
+      let c=Math.round((ev.clientX-r.left-cell/2)/cell), rr=Math.round((ev.clientY-r.top-cell/2)/cell);
+      c=Math.max(0,Math.min(STATE.grid.cols-1,c)); rr=Math.max(0,Math.min(STATE.grid.rows-1,rr)); dispatch({kind:'movetoken',id:t.id,r:rr,c});}
     el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up);});
+}
+function penColor(){const i=document.getElementById('penColor'); return (i&&i.value)||'#ffd24a';}
+function canErase(s){return ME.isHost||!s.owner||s.owner===ME.id;}
+function strokePts(s,cell){return s.pts.map(p=>(p[0]*cell)+','+(p[1]*cell)).join(' ');}
+function renderStrokes(){
+  const layer=document.getElementById('ink'); if(!layer)return; const {cols,rows,cell}=STATE.grid;
+  const W=cols*cell,H=rows*cell; const active=(mapMode==='draw'||mapMode==='erase-stroke');
+  layer.style.cssText='position:absolute;left:0;top:0;width:'+W+'px;height:'+H+'px;z-index:'+(active?6:2)+';pointer-events:'+(active?'auto':'none');
+  let svg='<svg id="inksvg" width="'+W+'" height="'+H+'" style="position:absolute;left:0;top:0;overflow:visible">';
+  (STATE.strokes||[]).forEach(s=>{
+    const pts=strokePts(s,cell);
+    svg+='<g><polyline points="'+pts+'" fill="none" stroke="'+s.color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+       +'<polyline class="inkhit" data-id="'+s.id+'" points="'+pts+'" fill="none" stroke="rgba(0,0,0,0)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g>';
+  });
+  svg+='</svg>';
+  layer.innerHTML=svg;
+  if(mapMode==='erase-stroke'){
+    layer.querySelectorAll('.inkhit').forEach(el=>{
+      const s=(STATE.strokes||[]).find(x=>x.id===el.dataset.id);
+      if(s&&canErase(s)){el.style.cursor='pointer'; el.style.pointerEvents='stroke';
+        el.addEventListener('pointerdown',e=>{e.stopPropagation(); dispatch({kind:'delstroke',id:el.dataset.id});});}
+      else el.style.pointerEvents='none';
+    });
+  }
+}
+function setupInk(){
+  const layer=document.getElementById('ink'); if(!layer)return;
+  const pc=document.getElementById('penColor');
+  if(pc){pc.value=localStorage.getItem('hh-pen-color')||'#ffd24a'; pc.oninput=()=>localStorage.setItem('hh-pen-color',pc.value);}
+  let drawing=null, temp=null;
+  function toCell(ev){const r=document.getElementById('grid').getBoundingClientRect(); const {cols,rows,cell}=STATE.grid;
+    let x=(ev.clientX-r.left)/cell, y=(ev.clientY-r.top)/cell;
+    x=Math.max(0,Math.min(cols,x)); y=Math.max(0,Math.min(rows,y));
+    return [Math.round(x*100)/100, Math.round(y*100)/100];}
+  layer.addEventListener('pointerdown',e=>{
+    if(mapMode!=='draw')return; e.preventDefault(); layer.setPointerCapture(e.pointerId);
+    window.__inkDrawing=true;
+    drawing=[toCell(e)];
+    const svgEl=document.getElementById('inksvg');
+    if(svgEl){temp=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+      temp.setAttribute('fill','none'); temp.setAttribute('stroke',penColor()); temp.setAttribute('stroke-width','3');
+      temp.setAttribute('stroke-linecap','round'); temp.setAttribute('stroke-linejoin','round'); svgEl.appendChild(temp);}
+  });
+  layer.addEventListener('pointermove',e=>{
+    if(!drawing)return; const p=toCell(e); const last=drawing[drawing.length-1];
+    if(Math.abs(p[0]-last[0])<0.04&&Math.abs(p[1]-last[1])<0.04)return;
+    drawing.push(p);
+    if(temp)temp.setAttribute('points',strokePts({pts:drawing},STATE.grid.cell));
+  });
+  function fin(){ if(!drawing)return;
+    if(drawing.length>1)dispatch({kind:'stroke',stroke:{id:rid(6),color:penColor(),owner:ME.id,pts:drawing}});
+    else renderStrokes();
+    drawing=null; temp=null; window.__inkDrawing=false; }
+  layer.addEventListener('pointerup',fin); layer.addEventListener('pointercancel',fin);
 }
 function setupPaint(){
   const g=document.getElementById('grid'); let batch=[];
@@ -1167,7 +1241,8 @@ function expandGrid(side){
   Object.keys(STATE.tiles).forEach(k=>{const[r,c]=k.split(',').map(Number); tiles[(r+dR)+','+(c+dC)]=STATE.tiles[k];});
   Object.keys(STATE.edges).forEach(k=>{const[o,r,c]=k.split('|'); edges[[o,(+r+dR),(+c+dC)].join('|')]=STATE.edges[k];});
   tokens.forEach(t=>{t.r+=dR; t.c+=dC;});
-  dispatch({kind:'mapset',grid:g,tiles,edges,tokens});
+  const strokes=JSON.parse(JSON.stringify(STATE.strokes||[])); strokes.forEach(s=>{s.pts.forEach(p=>{p[0]+=dC; p[1]+=dR;});});
+  dispatch({kind:'mapset',grid:g,tiles,edges,tokens,strokes});
 }
 function setScale(s){const g=JSON.parse(JSON.stringify(STATE.grid)); g.scale=s;
   dispatch({kind:'mapset',grid:g,tiles:STATE.tiles,edges:STATE.edges,tokens:STATE.tokens});}
@@ -1178,19 +1253,37 @@ function createToken(){const label=document.getElementById('t-label').value||'?'
 /* ================= INITIATIVE ================= */
 function renderInit(){
   const box=document.getElementById('initlist'); if(!box)return;
-  box.innerHTML=STATE.initiative.map((it)=>`<div class="initrow ${it.act?'act':''}">
-    <button class="xs" onclick="initToggle('${it.id}')" title="mark active">●</button>
-    <input value="${esc(it.name)}" onchange="initEdit('${it.id}','name',this.value)">
-    <span class="muted" style="font-size:11px">${esc(it.note||'')}</span>
-    <button class="xs" onclick="initMove('${it.id}',-1)">▲</button><button class="xs" onclick="initMove('${it.id}',1)">▼</button>
-    <button class="xs danger" onclick="initDel('${it.id}')">✕</button></div>`).join('')||'<p class="muted" style="font-size:12px;padding:6px">Empty. Add PCs or NPCs.</p>';
+  const rt=document.getElementById('roundTag'); if(rt)rt.textContent='Round '+(STATE.initRound||1);
+  const gm=ME.isHost;
+  box.innerHTML=STATE.initiative.map((it,idx)=>{
+    let st=null;
+    if(it.refId){const ch=STATE.characters[it.refId];
+      if(ch)st=hpStatus(ch.hp||0,ch.hpmax||0);
+      else{const n=STATE.encounter.find(x=>x.iid===it.refId); if(n)st=hpStatus(n.hp||0,n.hpmax||0);}}
+    const tgt=window.__target===it.id;
+    return '<div class="initrow '+(it.act?'act':'')+'" style="flex-direction:column;align-items:stretch;'+(tgt?'border-color:var(--crimson);box-shadow:0 0 6px rgba(181,68,59,.55)':'')+'"'
+      +(gm?' ondragover="initDragOver(event)" ondrop="initDrop(event,'+idx+')"':'')+'>'
+     +'<div class="row" style="gap:5px;flex-wrap:nowrap">'
+       +(gm?'<span draggable="true" ondragstart="initDragStart(event,'+idx+')" title="drag to reorder" style="cursor:grab;color:var(--dim)">⠿</span>':'')
+       +'<input value="'+esc(it.name)+'" '+(gm?'onchange="initEdit(\''+it.id+'\',\'name\',this.value)"':'disabled')+' style="font-size:12px;padding:1px 5px;flex:1;font-weight:600">'
+       +(st?'<span title="'+st[1]+'" style="font-size:12px;cursor:default">'+st[0]+'</span>':'')
+       +(it.note?'<span class="muted" style="font-size:10px;white-space:nowrap">'+esc(it.note)+'</span>':'')
+     +'</div>'
+     +'<div class="row" style="gap:4px;flex-wrap:nowrap;margin-top:3px;justify-content:flex-end">'
+       +(gm?'<button class="xs" onclick="initToggle(\''+it.id+'\')" title="mark as active turn" style="margin-right:auto">●</button>':'<span style="margin-right:auto"></span>')
+       +(it.refId?'<button class="xs'+(tgt?' danger':'')+'" onclick="tgTarget(\''+it.id+'\')" title="'+(tgt?'clear target':'target — attack rolls resolve vs this')+'">🎯</button>':'')
+       +(tgt&&it.refId?'<button class="xs" onclick="openReaction(\''+it.id+'\')" title="force a reaction roll">⚡</button>':'')
+       +(gm?'<button class="xs" onclick="initMove(\''+it.id+'\',-1)">▲</button><button class="xs" onclick="initMove(\''+it.id+'\',1)">▼</button>'
+         +'<button class="xs danger" onclick="initDel(\''+it.id+'\')">✕</button>':'')
+     +'</div></div>';
+  }).join('')||'<p class="muted" style="font-size:12px;padding:6px">Empty. Add PCs or NPCs.</p>';
 }
 function initAddRow(){const n=prompt('Name:'); if(!n)return; dispatch({kind:'initiative',list:[...STATE.initiative,{id:rid(4),name:n,note:''}]});}
 function initImportParty(){const rows=Object.values(STATE.characters).filter(c=>c.owner!=='gm'&&!STATE.initiative.some(x=>x.refId===c.id)).map(c=>({id:rid(4),refId:c.id,name:c.name,note:'PC'})); dispatch({kind:'initiative',list:[...STATE.initiative,...rows]});}
 function initEdit(id,f,v){dispatch({kind:'initiative',list:STATE.initiative.map(x=>x.id===id?{...x,[f]:v}:x)});}
 function initToggle(id){dispatch({kind:'initiative',list:STATE.initiative.map(x=>({...x,act:x.id===id?!x.act:false}))});}
 function initDel(id){dispatch({kind:'initiative',list:STATE.initiative.filter(x=>x.id!==id)});}
-function initClear(){if(confirm('Clear initiative?'))dispatch({kind:'initiative',list:[]});}
+function initClear(){if(confirm('Clear initiative and reset the round counter?')){dispatch({kind:'initiative',list:[]}); dispatch({kind:'initround',n:1});}}
 function initMove(id,dir){const l=[...STATE.initiative]; const i=l.findIndex(x=>x.id===id); const j=i+dir; if(j<0||j>=l.length)return; [l[i],l[j]]=[l[j],l[i]]; dispatch({kind:'initiative',list:l});}
 
 /* ================= NPC LIBRARY + ENCOUNTER ================= */
@@ -1311,7 +1404,8 @@ function cdDel(id){dispatch({kind:'countdowns',list:STATE.countdowns.filter(c=>c
 /* ================= DICE ================= */
 function rollDie(n){return Math.floor(Math.random()*n)+1;}
 function quickDuality(){ rollDuality(); }
-function rollDuality(cidArg,traitArg,extraMod){
+function rollDuality(cidArg,traitArg,extraMod,opts){
+  opts=opts||{};
   const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
   const cid=cidArg||(mine?mine.id:null);
   const ch=cid?STATE.characters[cid]:null;
@@ -1327,12 +1421,16 @@ function rollDuality(cidArg,traitArg,extraMod){
   else{const withHope=hope>fear;
     outcome=withHope?'with HOPE':'with FEAR'; oclass=withHope?'hope':'fear';
     if(withHope)hopeDelta=1; else fearDelta=1;}
-  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:advDie,total,diff:null,outcome,oclass};
-  const summary=outcome+' — total '+total+' (Hope '+hope+', Fear '+fear
+  if(opts.noEcon){hopeDelta=0;fearDelta=0;stressClear=false;}
+  let target=null;
+  if(opts.attack){const ti=getTargetInfo(); if(ti)target={name:ti.name,def:ti.def,hit:total>=ti.def};}
+  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:advDie,total,diff:null,outcome,oclass,label:opts.label||'',noEcon:!!opts.noEcon,target};
+  const summary=(opts.label?opts.label+': ':'')+outcome+' — total '+total+' (Hope '+hope+', Fear '+fear
     +(trait!=='0'&&ch?', '+cap(trait)+' '+(tmod>=0?'+':'')+tmod:'')
     +(advDie?((advDie>0?', Adv +':', Dis −')+Math.abs(advDie)):'')
-    +(omod?', mod '+(omod>0?'+':'')+omod:'')+')';
-  window.__lastDual={roll:JSON.parse(JSON.stringify(roll)),ctx:{cid:ch?ch.id:null,tmod,omod,hopeDelta,fearDelta,stressClear:!!(stressClear&&ch)}};
+    +(omod?', mod '+(omod>0?'+':'')+omod:'')+')'
+    +(target?((target.hit?' — ✅ HIT vs ':' — ❌ MISS vs ')+target.name+' ('+target.def+')'):'');
+  window.__lastDual={roll:JSON.parse(JSON.stringify(roll)),ctx:{cid:ch?ch.id:null,tmod,omod,hopeDelta,fearDelta,stressClear:!!(stressClear&&ch),label:opts.label||'',noEcon:!!opts.noEcon,tgtDef:target?target.def:null,tgtName:target?target.name:null}};
   dispatch({kind:'roll', entry:{id:roll.id,who:roll.roller,text:summary,oclass}, roll,
     charId:(ch&&(hopeDelta||stressClear)?ch.id:null), hopeDelta, fearDelta, stressClear:(stressClear&&ch)});
 }
@@ -1397,7 +1495,7 @@ function qaSpellcast(chId){const ch=STATE.characters[chId]; if(!ch)return;
   const ac=ch.activeCards||{}; let mod=0;
   if(ac['Arcana|Arcana-Touched']&&(ch.loadout||[]).filter(k=>k.indexOf('Arcana|')===0).length>=4)mod+=1;
   if(ac['Sage|Sage-Touched'])mod+=2;
-  rollDuality(chId,trait,mod);
+  rollDuality(chId,trait,mod,{attack:true,label:'Spellcast'});
 }
 
 function rerollDual(which){
@@ -1409,29 +1507,33 @@ function rerollDual(which){
   let outcome,oclass,hd=0,fd=0,sc=false;
   if(hope===fear){outcome='CRITICAL SUCCESS!';oclass='crit';hd=1;sc=true;}
   else{const wh=hope>fear; outcome=wh?'with HOPE':'with FEAR'; oclass=wh?'hope':'fear'; if(wh)hd=1; else fd=1;}
+  if(c.noEcon){hd=0;fd=0;sc=false;}
+  let target=null; if(c.tgtDef!=null&&c.tgtDef!==undefined)target={name:c.tgtName,def:c.tgtDef,hit:total>=c.tgtDef};
   const ch=c.cid?STATE.characters[c.cid]:null;
-  const roll={id:rid(6),roller:o.roller,hope,fear,adv:o.adv||0,total,diff:null,outcome,oclass};
-  const summary='↻ rerolled the '+which+' die: '+outcome+' — total '+total+' (Hope '+hope+', Fear '+fear+')';
+  const roll={id:rid(6),roller:o.roller,hope,fear,adv:o.adv||0,total,diff:null,outcome,oclass,label:c.label||'',noEcon:!!c.noEcon,target};
+  const summary='↻ rerolled the '+which+' die: '+outcome+' — total '+total+(target?((target.hit?' — ✅ HIT vs ':' — ❌ MISS vs ')+target.name):'');
   const dH=hd-(c.hopeDelta||0), dF=fd-(c.fearDelta||0), dS=sc&&!c.stressClear;
   window.__lastDual={roll:JSON.parse(JSON.stringify(roll)),ctx:{...c,hopeDelta:hd,fearDelta:fd,stressClear:sc}};
   dispatch({kind:'roll',entry:{id:roll.id,who:o.roller,text:summary,oclass},roll,
     charId:(ch?ch.id:null),hopeDelta:dH,fearDelta:dF,stressClear:(dS&&ch)});
 }
 
-function rollExpr(roller,label,count,sides,mod,chId){
+function rollExpr(roller,label,count,sides,mod,chId,isAtk){
   count=Math.max(1,Math.min(40,+count||1));
   const dice=[]; for(let i=0;i<count;i++)dice.push({s:+sides,v:rollDie(+sides)});
-  if(chId){const ch=STATE.characters[chId]; // Not Good Enough (Blade L1, RAW): reroll 1s and 2s on damage dice
+  if(chId){const ch=STATE.characters[chId];
     if(ch&&ch.activeCards&&ch.activeCards['Blade|Not Good Enough']){
       dice.forEach(d=>{ if(d.v<=2){d.old=d.v; d.v=rollDie(d.s); d.r=true;} });
     }}
-  finishPool(roller,dice,+mod||0,label);
+  finishPool(roller,dice,+mod||0,label,isAtk);
 }
-function finishPool(roller,dice,mod,label){
+function finishPool(roller,dice,mod,label,isAtk){
   const total=dice.reduce((a,d)=>a+d.v,0)+mod;
   const desc=DIE_TYPES.filter(s=>dice.some(d=>d.s===s)).map(s=>dice.filter(d=>d.s===s).length+'d'+s).join('+')+(mod?((mod>0?'+':'')+mod):'');
-  const roll={id:rid(6),roller,kind:'pool',label,dice,mod,total,desc};
-  dispatch({kind:'roll',entry:{id:roll.id,who:roller,text:(label?label+': ':'')+'rolls '+desc+' → '+total},roll,hopeDelta:0,fearDelta:0});
+  let target=null;
+  if(isAtk){const ti=getTargetInfo(); if(ti)target={name:ti.name,def:ti.def,hit:total>=ti.def};}
+  const roll={id:rid(6),roller,kind:'pool',label,dice,mod,total,desc,target};
+  dispatch({kind:'roll',entry:{id:roll.id,who:roller,text:(label?label+': ':'')+'rolls '+desc+' → '+total+(target?((target.hit?' — ✅ HIT vs ':' — ❌ MISS vs ')+target.name+' ('+target.def+')'):'')},roll,hopeDelta:0,fearDelta:0});
 }
 function physAnimate(tray){
   [...tray.children].forEach((el,i)=>{
@@ -1463,7 +1565,7 @@ function findDice(text,ch){
   let count=m[1]?+m[1]:((/proficiency/i.test(text)&&ch)?(ch.proficiency||1):1);
   return {count:Math.max(1,count), sides:+m[2], mod:m[3]?+m[3].replace(/\s/g,''):0};
 }
-function qaAttack(chId,trait){ rollDuality(chId,trait); }
+function qaAttack(chId,trait){ rollDuality(chId,trait,0,{attack:true,label:'Attack'}); }
 function qbtn(fn,icon,label){return '<button class="sm" onclick="'+fn+'">'+icon+' '+label+'</button>';}
 function weaponDmg(ch,slot){
   const w=ch[slot]; if(!w)return null;
@@ -1490,6 +1592,8 @@ function renderQuickActions(){
     tc.innerHTML = mineC ? TRAITS.map(t=>'<button class="xs '+(window.__traitSel.includes(t)?'primary':'')+'" onclick="tgTrait(\''+t+'\')" title="add '+cap(t)+' as a modifier">'+cap(t).slice(0,3)+' '+(mineC[t]>=0?'+':'')+mineC[t]+'</button>').join(' ')
       +' <button class="xs '+(window.__profMult?'primary':'')+'" onclick="window.__profMult=!window.__profMult;renderQuickActions()" title="multiply pool dice count by your Proficiency">×Prof '+(mineC.proficiency||1)+'</button>'
     : '<span class="muted" style="font-size:11px">no character — flat rolls only</span>'; }
+  const sb=document.getElementById('saveBtns');
+  if(sb)sb.innerHTML=mineC?TRAITS.map(t=>'<button class="xs" onclick="rollReaction(\''+mineC.id+'\',\''+t+'\',\'Save\')">'+cap(t).slice(0,3)+' '+(mineC[t]>=0?'+':'')+mineC[t]+'</button>').join(' '):'<span class="muted" style="font-size:11px">no character</span>';
   const q=s=>String(s).replace(/\\/g,'').replace(/'/g,"\\'");
   let h='';
   Object.values(STATE.characters).filter(c=>c.owner===ME.id).forEach(ch=>{
@@ -1513,7 +1617,7 @@ function renderQuickActions(){
   if(ME.isHost&&STATE.encounter.length){
     h+='<div class="muted" style="font-size:11px;margin-top:4px">Active NPCs <span class="raw">(adversaries attack with d20 + mod, RAW)</span></div>';
     STATE.encounter.forEach(n=>{
-      let btns=[qbtn("rollExpr('"+q(n.name)+"','attack (vs Evasion)',1,20,"+(n.atk||0)+")",'🎯',esc(n.name)+' atk d20'+(n.atk?((n.atk>0?'+':'')+n.atk):''))];
+      let btns=[qbtn("rollExpr('"+q(n.name)+"','attack (vs Evasion)',1,20,"+(n.atk||0)+",null,1)",'🎯',esc(n.name)+' atk d20'+(n.atk?((n.atk>0?'+':'')+n.atk):''))];
       const dm=findDice(n.dmg||''); if(dm)btns.push(qbtn("rollExpr('"+q(n.name)+"','damage',"+dm.count+","+dm.sides+","+dm.mod+")",'💥','dmg '+esc(n.dmg||'')));
       h+='<div class="row" style="margin-bottom:4px">'+btns.join(' ')+'</div>';
     });
@@ -1530,26 +1634,29 @@ function buildQuickDice(){const q=document.getElementById('quickdice'); if(!q)re
     b.onclick=()=>dispatch({kind:'log',entry:{id:rid(6),who:ME.name,text:`rolls d${s} → ${rollDie(s)}`}}); q.appendChild(b);});}
 function showRollToast(roll){
   const t=document.getElementById('rolltoast');
+  const tgtLine=roll.target?('<div class="outcome '+(roll.target.hit?'hope':'fail')+'" style="margin-top:4px">'+(roll.target.hit?'✅ HIT':'❌ MISS')+' vs '+esc(roll.target.name)+' <span class="muted" style="font-size:12px">(needs '+roll.target.def+')</span></div>'):'';
   if(roll.kind==='pool'){
     const rr=(roll.dice||[]).filter(d=>d.r).length;
     const ds=(roll.dice||[]).reduce((a,d)=>a+d.v,0);
     t.innerHTML='<div class="roller">'+esc(roll.roller)+' rolls '+esc((roll.label?roll.label+' — ':'')+(roll.desc||''))+'</div>'
      +'<div class="row" id="trayDice" style="gap:8px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto"></div>'
      +'<div style="margin-top:8px;font-family:Georgia,serif"><span class="muted" style="font-size:16px">'+ds+(roll.mod?' '+(roll.mod>0?'+ ':'− ')+Math.abs(roll.mod):'')+' = </span><span style="font-size:32px;font-weight:700;color:var(--gold);text-shadow:0 0 8px rgba(214,166,74,.4)">'+roll.total+'</span></div>'
+     +tgtLine
      +(rr?'<div class="muted" style="font-size:11px">⚡ Not Good Enough rerolled '+rr+' (1s &amp; 2s, dashed)</div>':'');
     const tray=t.querySelector('#trayDice');
-    (roll.dice||[]).forEach(d=>{const el=document.createElement('div'); el.className='diephys shape'+d.s; el.dataset.final=d.v; el.dataset.sides=d.s; if(d.r)el.dataset.old=d.old; el.textContent=d.v;
-      tray.appendChild(el);});
+    (roll.dice||[]).forEach(d=>{const el=document.createElement('div'); el.className='diephys shape'+d.s; el.dataset.final=d.v; el.dataset.sides=d.s; if(d.r)el.dataset.old=d.old; el.textContent=d.v; tray.appendChild(el);});
     t.classList.add('show'); physAnimate(tray);
   } else {
-    t.innerHTML='<div class="roller">'+esc(roll.roller)+' rolls…</div>'
+    t.innerHTML='<div class="roller">'+esc(roll.roller)+' rolls'+(roll.label?' — '+esc(roll.label):'')+'…</div>'
      +'<div class="row" style="gap:12px;align-items:flex-end;justify-content:center">'
      +'<div class="diewrap"><span class="dl hope">Hope</span><div class="die hope">'+roll.hope+'</div></div>'
      +'<div class="diewrap"><span class="dl fear">Fear</span><div class="die fear">'+roll.fear+'</div></div>'
      +(roll.adv?('<div class="diewrap"><span class="dl" style="color:'+(roll.adv>0?'#8fd8a0':'#e8a39c')+'">'+(roll.adv>0?'▲ Adv':'▼ Dis')+'</span><div class="die adv"'+(roll.adv<0?' style="border-color:var(--crimson);color:#e8a39c;background:#240f0f"':'')+'>'+Math.abs(roll.adv)+'</div></div>'):'')
      +'</div><div class="outcome '+roll.oclass+'">'+roll.outcome+'</div>'
      +(function(){const dm=roll.total-roll.hope-roll.fear-(roll.adv||0);
-       return '<div style="font-family:Georgia,serif"><span class="muted" style="font-size:16px">'+roll.hope+' + '+roll.fear+(roll.adv?' '+(roll.adv>0?'+ ':'− ')+Math.abs(roll.adv):'')+(dm?' '+(dm>0?'+ ':'− ')+Math.abs(dm):'')+' = </span><span style="font-size:32px;font-weight:700;color:var(--gold);text-shadow:0 0 8px rgba(214,166,74,.4)">'+roll.total+'</span>'+((roll.diff!==null&&roll.diff!==undefined)?'<span class="muted" style="font-size:14px"> vs '+roll.diff+'</span>':'')+'</div>';})();
+       return '<div style="font-family:Georgia,serif"><span class="muted" style="font-size:16px">'+roll.hope+' + '+roll.fear+(roll.adv?' '+(roll.adv>0?'+ ':'− ')+Math.abs(roll.adv):'')+(dm?' '+(dm>0?'+ ':'− ')+Math.abs(dm):'')+' = </span><span style="font-size:32px;font-weight:700;color:var(--gold);text-shadow:0 0 8px rgba(214,166,74,.4)">'+roll.total+'</span></div>';})()
+     +tgtLine
+     +(roll.noEcon?'<div class="muted" style="font-size:11px">reaction roll — no Hope/Fear generated (RAW)</div>':'');
     if(window.__lastDual&&window.__lastDual.roll&&window.__lastDual.roll.id===roll.id){
       t.innerHTML+='<div class="row" style="justify-content:center;gap:6px;margin-top:6px">'
        +'<button class="xs" onclick="rerollDual(\'hope\')" title="Endless Charisma / Reassurance / Support Tank — pay the card cost yourself">↻ reroll Hope die</button>'
@@ -1599,6 +1706,7 @@ function syncCharSelects(){const opts=Object.values(STATE.characters).map(c=>`<o
   const tc=document.getElementById('t-char'); if(tc)tc.innerHTML='<option value="">— none —</option>'+opts;}
 function refreshAll(){
   const g=document.getElementById('grid'); if(g&&!g.__bound){g.__bound=true; setupPaint();}
+  const ink=document.getElementById('ink'); if(ink&&!ink.__bound){ink.__bound=true; setupInk();}
   renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); buildPalette(); updatePeerCount();
   if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id; showRollToast(STATE.lastRoll);}
   autosave();
@@ -1945,6 +2053,51 @@ function gmInspect(id){const ch=STATE.characters[id]; if(!ch)return;
   const box=document.getElementById('genBox'); box.classList.add('wide');
   box.innerHTML='<div class="row" style="justify-content:space-between"><h3 style="color:var(--gold);margin:0">Inspect — '+esc(ch.name)+' <span class="muted" style="font-size:12px">read-only</span></h3><button class="sm" onclick="closeGen()">close</button></div>'+html;
   document.getElementById('genModal').classList.add('show');
+}
+
+function nextTurn(){if(!ME.isHost)return; if(!STATE.initiative.length){flash('Initiative is empty.');return;} dispatch({kind:'initnext'});}
+function initDragStart(e,i){window.__dragIdx=i; e.dataTransfer.effectAllowed='move';}
+function initDragOver(e){if(window.__dragIdx==null)return; e.preventDefault(); e.dataTransfer.dropEffect='move';}
+function initDrop(e,i){e.preventDefault(); const from=window.__dragIdx; window.__dragIdx=null;
+  if(from==null||from===i)return;
+  const l=[...STATE.initiative]; const m=l.splice(from,1)[0]; l.splice(i,0,m);
+  dispatch({kind:'initiative',list:l});}
+
+function hpStatus(cur,max){ if(!max)return null; const rem=1-(cur||0)/max;
+  if(rem<=0)return ['💀','Dead']; if(rem<=0.2)return ['🔴','Critical']; if(rem<=0.5)return ['🟡','Wounded']; return ['🟢','Healthy'];}
+function getTargetInfo(){
+  const t=window.__target; if(!t)return null;
+  const row=STATE.initiative.find(x=>x.id===t); if(!row||!row.refId)return null;
+  const ch=STATE.characters[row.refId];
+  if(ch)return {name:ch.name,def:effStats(ch).evasion,kind:'pc',ref:ch.id};
+  const n=STATE.encounter.find(x=>x.iid===row.refId);
+  if(n)return {name:n.name,def:n.diff,kind:'npc',ref:n.iid};
+  return null;
+}
+function tgTarget(id){window.__target=(window.__target===id?null:id); renderInit();
+  const t=getTargetInfo(); if(t)flash('🎯 Targeting '+t.name+' — attacks resolve vs '+t.def); else flash('Target cleared');}
+function openReaction(rowId){
+  const row=STATE.initiative.find(x=>x.id===rowId); if(!row||!row.refId)return;
+  const ch=STATE.characters[row.refId];
+  if(!ch){ // adversary: roll the d20 immediately, no confirmation
+    const n=STATE.encounter.find(x=>x.iid===row.refId); if(!n)return;
+    rollExpr(n.name,'Reaction',1,20,0); return;
+  }
+  // PC: the trait pick IS the ability choice — one click rolls
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  box.innerHTML='<h3 style="color:var(--gold)">Reaction — '+esc(ch.name)+'</h3>'
+   +'<p class="muted" style="font-size:12px">Click the trait to roll instantly (no Hope/Fear, RAW).</p>'
+   +'<div class="grid3">'+TRAITS.map(t=>'<button class="sm" onclick="closeGen();rollReaction(\''+ch.id+'\',\''+t+'\',\'Reaction\')">'+cap(t)+' '+(ch[t]>=0?'+':'')+ch[t]+'</button>').join('')+'</div>';
+  document.getElementById('genModal').classList.add('show');
+}
+function rollReaction(chId,trait,label){
+  const ch=STATE.characters[chId]; const tmod=ch?(ch[trait]||0):0;
+  const hope=rollDie(12),fear=rollDie(12); const total=hope+fear+tmod;
+  const crit=hope===fear;
+  const outcome=(label||'Reaction')+' ('+cap(trait)+')'+(crit?' — CRITICAL!':'');
+  const oclass=crit?'crit':(hope>fear?'hope':'fear');
+  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:0,total,diff:null,outcome,oclass,noEcon:true,label:label||'Reaction'};
+  dispatch({kind:'roll',entry:{id:roll.id,who:roll.roller,text:(label||'Reaction')+' ('+cap(trait)+'): total '+total+' (Hope '+hope+', Fear '+fear+') — no Hope/Fear (reaction)'},roll,hopeDelta:0,fearDelta:0});
 }
 
 function saveSession(){
