@@ -605,11 +605,33 @@ let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=
 
 function rid(n){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 
+/* ============ ICE/TURN (relay for phones on cellular / strict NAT) ============ */
+let HH_ICE={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}]};
+(async function initIce(){
+  try{
+    const custom=localStorage.getItem('hh-turn-url'); // optional: your own Metered.ca credentials URL
+    if(custom){ const r=await fetch(custom); const s=await r.json(); if(Array.isArray(s)&&s.length){ HH_ICE={iceServers:s}; console.log('ICE: custom TURN loaded'); return; } }
+    const secret='openrelayprojectsecret'; // Open Relay public staticauth secret (openrelayproject.org)
+    const username=''+(Math.floor(Date.now()/1000)+12*3600); // 12h ephemeral credential
+    const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-1'},false,['sign']);
+    const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(username));
+    const cred=btoa(String.fromCharCode(...new Uint8Array(sig)));
+    const t=u=>({urls:u,username:username,credential:cred});
+    HH_ICE.iceServers.push(
+      t('turn:staticauth.openrelay.metered.ca:80'),
+      t('turn:staticauth.openrelay.metered.ca:80?transport=tcp'),
+      t('turn:staticauth.openrelay.metered.ca:443'),
+      t('turns:staticauth.openrelay.metered.ca:443?transport=tcp')
+    );
+    console.log('ICE: TURN relay ready');
+  }catch(e){ console.warn('ICE: TURN setup failed, STUN only',e); }
+})();
+
 /* ================= NETWORK ================= */
 function hostRoom(){
   ME.name=(document.getElementById('m-name').value||'GM').trim();
   const code=rid(4).toUpperCase(); setStatus('Starting host…');
-  ME.peer=new Peer('hh-'+code,{debug:1});
+  ME.peer=new Peer('hh-'+code,{debug:1,config:HH_ICE});
   ME.peer.on('open',id=>{
     ME.id=id; ME.isHost=true; ME.role='gm';
     document.getElementById('roomCode').textContent=code;
@@ -635,7 +657,7 @@ function joinRoom(){
   ME.name=(document.getElementById('m-name').value||'Player').trim();
   const code=(document.getElementById('m-code').value||'').trim().toUpperCase();
   if(code.length<4){setStatus('Enter the 4-letter code.');return;}
-  setStatus('Connecting…'); ME.peer=new Peer({debug:1});
+  setStatus('Connecting…'); ME.peer=new Peer({debug:1,config:HH_ICE});
   ME.peer.on('open',id=>{
     ME.id=id; ME.isHost=false; ME.role='player';
     const conn=ME.peer.connect('hh-'+code,{metadata:{name:ME.name},reliable:true});
