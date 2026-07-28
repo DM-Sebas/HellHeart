@@ -510,6 +510,7 @@
   <button class="sm" style="width:100%;margin-top:8px" onclick="openCampaignFile()">📂 Abrir campaña desde archivo…</button>
   <p class="muted" style="font-size:11px;margin-top:8px">La campaña se guarda sola, en cada cambio. Los jugadores guardan copia local al sincronizar: si el GM no está conectado, entran igual y ven sus personajes (modo offline).</p>
   <div id="m-status" class="muted" style="margin-top:6px;font-size:12px"></div>
+  <div class="muted" style="font-size:10px;margin-top:6px;cursor:pointer;text-decoration:underline" onclick="cfgPeerHost()">config. de red (broker propio)</div>
 </div></div>
 
 <div class="modal" id="tokenModal"><div class="box">
@@ -684,7 +685,28 @@ async function openCampaignFile(){
     flash('Campaña cargada desde archivo. Entra como GM cuando quieras.');
   }catch(e){}
 }
-const PH_BUILD='b25';
+const PH_BUILD='b26';
+function peerOpts(){
+  const o={debug:1,config:HH_ICE};
+  try{
+    const h=(localStorage.getItem('hh-peer-host')||'').trim();
+    if(h){
+      const rest=h.replace(/^https?:\/\//,'').split('/');
+      const hp=rest.shift().split(':');
+      o.host=hp[0]; o.port=+(hp[1]||443); o.secure=true;
+      o.path='/'+(rest.join('/')||'');
+    }
+  }catch(e){}
+  return o;
+}
+function cfgPeerHost(){
+  const cur=localStorage.getItem('hh-peer-host')||'';
+  const v=prompt('Broker de señalización propio (vacío = público 0.peerjs.com).\nFormato: midominio.com  o  midominio.com:443/ruta\nTODOS en la mesa deben usar el mismo.',cur);
+  if(v===null)return;
+  if(v.trim())localStorage.setItem('hh-peer-host',v.trim());
+  else localStorage.removeItem('hh-peer-host');
+  flash('Guardado — recarga la página para aplicarlo.');
+}
 const LSC='ph-campaigns';
 let CAMP=null;
 function campIndex(){try{return JSON.parse(localStorage.getItem(LSC))||[]}catch(e){return[]}}
@@ -765,7 +787,7 @@ function gmSelfTest(){
   if(!CAMP){alert('Entra a una campaña primero.');return;}
   if(!ME.peer||!ME.isHost){alert('El auto-test es para el GM hosteando. Estado actual: '+(ME.peer?'jugador':'SIN CONEXIÓN — estás en modo local, los jugadores no pueden entrar. Recarga y vuelve a entrar como GM.'));return;}
   flash('Probando la sala desde afuera…');
-  const t=new Peer({debug:0,config:HH_ICE});
+  const t=new Peer(peerOpts());
   let ok=false;
   const done=(msg)=>{try{t.destroy();}catch(e){} alert(msg);};
   const timer=setTimeout(()=>{if(!ok)done('✗ Tu sala NO respondió en 12s.\nTu registro en el broker probablemente cayó: recarga la página y vuelve a entrar a la campaña como GM. Si se repite, es problema de red/broker.');},12000);
@@ -786,7 +808,7 @@ function gmLocalFallback(){
 }
 function hostCampaign(code){
   setStatus('Levantando la campaña…'); gmLocalFallback.__done=false;
-  ME.peer=new Peer('hh-'+code,{debug:1,config:HH_ICE});
+  ME.peer=new Peer('hh-'+code,peerOpts());
   ME.peer.on('open',id=>{
     ME.id=id; ME.isHost=true; ME.role='gm';
     document.getElementById('roomCode').textContent=code;
@@ -842,7 +864,7 @@ function joinCampaign(cmp,localState){
   function startPeer(){
     tries++;
     try{ME.peer&&ME.peer.destroy();}catch(e){}
-    ME.peer=new Peer({debug:1,config:HH_ICE});
+    ME.peer=new Peer(peerOpts());
     ME.peer.on('open',id=>{
       ME.id=id; ME.isHost=false; ME.role='player';
       setStatus('Broker OK — buscando la sala '+cmp.code+'…');
@@ -876,7 +898,7 @@ function joinCampaign(cmp,localState){
 function hostRoom(){
   ME.name=(document.getElementById('m-name').value||'GM').trim();
   const code=rid(4).toUpperCase(); setStatus('Starting host…');
-  ME.peer=new Peer('hh-'+code,{debug:1,config:HH_ICE});
+  ME.peer=new Peer('hh-'+code,peerOpts());
   ME.peer.on('open',id=>{
     ME.id=id; ME.isHost=true; ME.role='gm';
     document.getElementById('roomCode').textContent=code;
@@ -902,7 +924,7 @@ function joinRoom(){
   ME.name=(document.getElementById('m-name').value||'Player').trim();
   const code=(document.getElementById('m-code').value||'').trim().toUpperCase();
   if(code.length<4){setStatus('Enter the 4-letter code.');return;}
-  setStatus('Connecting…'); ME.peer=new Peer({debug:1,config:HH_ICE});
+  setStatus('Connecting…'); ME.peer=new Peer(peerOpts());
   ME.peer.on('open',id=>{
     ME.id=id; ME.isHost=false; ME.role='player';
     const conn=ME.peer.connect('hh-'+code,{metadata:{name:ME.name},reliable:true});
