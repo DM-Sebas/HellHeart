@@ -684,7 +684,7 @@ async function openCampaignFile(){
     flash('Campaña cargada desde archivo. Entra como GM cuando quieras.');
   }catch(e){}
 }
-const PH_BUILD='b24';
+const PH_BUILD='b25';
 const LSC='ph-campaigns';
 let CAMP=null;
 function campIndex(){try{return JSON.parse(localStorage.getItem(LSC))||[]}catch(e){return[]}}
@@ -835,31 +835,43 @@ function joinCampaign(cmp,localState){
       flash('El GM no está conectado: ves la última versión sincronizada. Los cambios locales no se compartirán.');
     } else setStatus(reason==='nf'
       ?'No se encontró la campaña '+cmp.code+'. Revisa: (1) el GM debe estar DENTRO de la campaña como GM ahora mismo, (2) el código es el de 6 caracteres que sale junto al nombre de su campaña, (3) ambos deben tener el mismo build (arriba).'
-      :'Problema de red buscando al GM (broker/relay). Ambos revisen conexión y recarguen con Ctrl+F5.');
+      :'Tu navegador no pudo conectar con el broker de señalización (3 intentos). Test rápido: abre 0.peerjs.com en una pestaña — si no carga, tu red lo bloquea: prueba con datos móviles/otra red o modo incógnito. Si carga, el broker gratuito está caído: reintenta en unos minutos.');
   };
-  const timer=setTimeout(offline,15000);   // TURN negotiation on mobile takes longer
-  ME.peer=new Peer({debug:1,config:HH_ICE});
-  ME.peer.on('open',id=>{
-    ME.id=id; ME.isHost=false; ME.role='player';
-    const conn=ME.peer.connect('hh-'+cmp.code,{metadata:{name:ME.name},reliable:true});
-    ME.hostConn=conn;
-    conn.on('open',()=>{ settled=true; clearTimeout(timer);
-      document.getElementById('roomCode').textContent=cmp.code;
-      document.getElementById('roomPill').style.display='';
-      document.getElementById('roleTag').textContent='Jugador';
-      setDot('on','connected'); setStatus(''); closeModal('connectModal');
-      layout('player');
-      conn.send({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}});
+  const timer=setTimeout(offline,20000);   // covers broker retries + TURN negotiation
+  let tries=0;
+  function startPeer(){
+    tries++;
+    try{ME.peer&&ME.peer.destroy();}catch(e){}
+    ME.peer=new Peer({debug:1,config:HH_ICE});
+    ME.peer.on('open',id=>{
+      ME.id=id; ME.isHost=false; ME.role='player';
+      setStatus('Broker OK — buscando la sala '+cmp.code+'…');
+      const conn=ME.peer.connect('hh-'+cmp.code,{metadata:{name:ME.name},reliable:true});
+      ME.hostConn=conn;
+      conn.on('open',()=>{ settled=true; clearTimeout(timer);
+        document.getElementById('roomCode').textContent=cmp.code;
+        document.getElementById('roomPill').style.display='';
+        document.getElementById('roleTag').textContent='Jugador';
+        setDot('on','connected'); setStatus(''); closeModal('connectModal');
+        layout('player');
+        conn.send({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}});
+      });
+      conn.on('data',d=>playerReceive(d));
+      conn.on('close',()=>setDot('','disconnected'));
     });
-    conn.on('data',d=>playerReceive(d));
-    conn.on('close',()=>setDot('','disconnected'));
-  });
-  ME.peer.on('disconnected',()=>{try{ME.peer.reconnect();}catch(e){}});
-  ME.peer.on('error',e=>{
-    if(e.type==='peer-unavailable'){clearTimeout(timer); offline('nf');}
-    else if(e.type==='network'||e.type==='server-error'){clearTimeout(timer); offline('net');}
-    else setStatus('Error: '+e.type);
-  });
+    ME.peer.on('disconnected',()=>{try{ME.peer.reconnect();}catch(e){}});
+    ME.peer.on('error',e=>{
+      if(settled)return;
+      if(e.type==='peer-unavailable'){clearTimeout(timer); offline('nf');}
+      else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){
+        if(tries<3){ setStatus('El broker de señalización no responde — reintento '+tries+'/2…');
+          setTimeout(startPeer,2000); }
+        else { clearTimeout(timer); offline('net'); }
+      }
+      else setStatus('Error: '+e.type);
+    });
+  }
+  startPeer();
 }
 function hostRoom(){
   ME.name=(document.getElementById('m-name').value||'GM').trim();
