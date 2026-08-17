@@ -47,7 +47,38 @@
   #stock{display:none}
   .panel{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0}
   .scroll{overflow:auto;padding:14px}
-  .sheetwrap{max-width:880px;margin:0 auto}
+  .sheetwrap{max-width:1700px;margin:0 auto}
+  /* ---- wide-screen layouts (this app is used on desktop, so use the width) ----
+     Every rule below is a progressive enhancement: the base case is a single
+     column, identical to the old phone-shaped layout, so nothing breaks on a
+     narrow window or a split screen. Columns are added as width allows. */
+  /* character sheet: two columns — all the numbers on the left, everything you
+     carry or know on the right. The right column gets more room because it holds
+     card grids, which need the width. */
+  .sh-grid{display:grid;gap:10px 18px;grid-template-columns:1fr;align-items:start}
+  .sh-grid>.sh-full{grid-column:1/-1}
+  .sh-sec{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .sh-sec>h5{margin:0 0 2px;font-family:Georgia,serif;font-size:12px;letter-spacing:.5px;
+    text-transform:uppercase;color:var(--gold);opacity:.75;border-bottom:1px solid var(--line);padding-bottom:3px}
+  .shsub{font-family:Georgia,serif;font-size:11px;letter-spacing:.4px;text-transform:uppercase;
+    color:var(--dim);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+  .sh-sec>h3{margin:6px 0 0}
+  .sh-sec hr{margin:6px 0}
+  @media(min-width:1050px){.sh-grid{grid-template-columns:minmax(320px,1fr) minmax(0,1.7fr)}}
+  @media(min-width:1500px){.sh-grid{grid-template-columns:minmax(340px,1fr) minmax(0,2.2fr)}}
+  /* the right column is narrower than full width, so pack its cards tighter to
+     claw back the rows that squeeze would otherwise cost */
+  .sh-kit .cardgrid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+  .sh-kit .gcard .txt{font-size:12px;padding:7px 9px}
+  /* stacked-card panels (Dice, GM/Fear): flow the cards into columns instead of
+     one tall ribbon of full-width bars. Overrides .panel's flex column above. */
+  .panegrid{display:grid;gap:12px;grid-template-columns:1fr;align-content:start}
+  .panegrid>.pg-full{grid-column:1/-1}
+  .panegrid>.card{margin-bottom:0}
+  @media(min-width:1100px){.panegrid{grid-template-columns:1fr 1fr}
+    .panegrid>.pg-wide{grid-column:span 1}}
+  @media(min-width:1650px){.panegrid{grid-template-columns:1fr 1fr 1fr}
+    .panegrid>.pg-wide{grid-column:span 2}}
 
   .dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
   .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
@@ -176,11 +207,21 @@
   .gcard.eq{border-color:var(--gold)}
   .gcard .top{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);background:#2a2118}
   .gcard .top .nm{font-family:Georgia,serif;font-weight:700;color:var(--gold);font-size:14px}
+  /* ---- colour-coding: --dc is the card's accent (domain or item kind), --dcw a
+     translucent wash of it. Both are set inline per card; everything falls back to
+     the old neutral look if they're absent. ---- */
+  .gcard[data-dc]{border-left:4px solid var(--dc);border-color:var(--dc) var(--line) var(--line) var(--dc)}
+  .gcard[data-dc] .top{background:linear-gradient(90deg,var(--dcw),#2a2118 78%)}
+  .gcard[data-dc] .top .nm{color:var(--dc);filter:brightness(1.35)}
+  .gcard[data-dc]:hover{box-shadow:0 0 0 1px var(--dc),0 4px 14px rgba(0,0,0,.45)}
   .gcard .meta{font-size:11px;color:var(--dim);display:flex;gap:6px;flex-wrap:wrap;padding:5px 10px}
   .gcard .txt{padding:8px 10px;font-size:12.5px;white-space:pre-wrap;flex:1}
   .gcard .acts{padding:6px 10px;border-top:1px solid var(--line);display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
   .badge{font-size:10px;padding:1px 6px;border-radius:8px;border:1px solid var(--line);color:var(--dim)}
-  .badge.dom{border-color:var(--gold);color:var(--gold)}
+  /* domain / kind badges are filled with the card's accent colour (--dc, set inline);
+     they fall back to the old gold outline when a card has no accent */
+  .badge.dom,.badge.kind{border-color:var(--dc,var(--gold));color:var(--dc,var(--gold));font-weight:700;letter-spacing:.3px}
+  .gcard[data-dc] .badge.dom,.gcard[data-dc] .badge.kind{background:var(--dc);color:#15110f}
   .badge.lvl{border-color:#6a8fb0;color:#9fc4e0}
   .badge.spell{border-color:var(--fear);color:#c89df0}
   .badge.feat{border-color:var(--ok);color:#8fd8a0}
@@ -423,7 +464,7 @@
   </div>
 
   <!-- FEAR (GM) -->
-  <div class="panel scroll" id="panel-fear" data-pane="fear" data-label="Fear">
+  <div class="panel scroll panegrid" id="panel-fear" data-pane="fear" data-label="Fear">
     <div class="card">
       <h3>Fear Pool <span class="muted" style="font-size:12px">(max 12 · GM)</span></h3>
       <div class="fearpool" id="fearpool"></div>
@@ -479,8 +520,8 @@
   </div>
 
   <!-- DICE -->
-  <div class="panel scroll" id="panel-dice" data-pane="dice" data-label="Dice">
-    <div class="card" style="padding:6px 10px"><div class="row" style="align-items:center">
+  <div class="panel scroll panegrid" id="panel-dice" data-pane="dice" data-label="Dice">
+    <div class="card pg-full" style="padding:6px 10px"><div class="row" style="align-items:center">
       <b style="font-size:12px">🛡 Save:</b><span id="saveBtns" class="row" style="gap:4px"></span>
       <span class="muted" style="font-size:10px;margin-left:auto">duality + trait · reaction, no Hope/Fear (RAW)</span>
     </div></div>
@@ -496,7 +537,7 @@
         <button class="sm" onclick="clearPool()">clear</button></div>
       <p class="muted" style="font-size:11px;margin:4px 0 0">trait buttons add their modifier · ×Prof multiplies the dice · 🎭 rolls Hope &amp; Fear + modifiers</p>
     </div>
-    <div class="card"><h4>Quick rolls — gear, cards &amp; NPCs</h4><div id="qaList"></div></div>
+    <div class="card pg-wide"><h4>Quick rolls — gear, cards &amp; NPCs</h4><div id="qaList"></div></div>
   </div>
 
   <!-- RULES -->
@@ -1314,55 +1355,70 @@ function renderOneSheet(ch){
       ${ed&&ch.owner===ME.id?`<button class="xs" onclick="releaseChar('${ch.id}')" title="free this character so another player can claim it">release</button>`:''}
       ${ed?`<button class="sm danger" onclick="delChar('${ch.id}')">✕</button>`:''}
     </div>
-    <div class="grid3" style="margin-top:8px">
-      <div class="col"><label>Ancestry</label><input ${dis} list="anc" value="${esc(ch.ancestry)}" onchange="editC('${ch.id}','ancestry',this.value)"></div>
-      <div class="col"><label>Community</label><input ${dis} list="com" value="${esc(ch.community)}" onchange="editC('${ch.id}','community',this.value)"></div>
-      <div class="col"><label>Class</label><select ${dis} onchange="setClass('${ch.id}',this.value)"><option value="">—</option>${CLASSES.map(c=>`<option ${c===ch.cls?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="sh-grid" style="margin-top:8px">
+
+      <section class="sh-sec sh-stats"><h5>Stats</h5>
+        <div class="grid3">
+          <div class="col"><label>Ancestry</label><input ${dis} list="anc" value="${esc(ch.ancestry)}" onchange="editC('${ch.id}','ancestry',this.value)"></div>
+          <div class="col"><label>Community</label><input ${dis} list="com" value="${esc(ch.community)}" onchange="editC('${ch.id}','community',this.value)"></div>
+          <div class="col"><label>Class</label><select ${dis} onchange="setClass('${ch.id}',this.value)"><option value="">—</option>${CLASSES.map(c=>`<option ${c===ch.cls?'selected':''}>${c}</option>`).join('')}</select></div>
+        </div>
+        <div class="grid3">
+          <div class="col"><label>Subclass</label><select ${dis} onchange="editC('${ch.id}','subclass',this.value)"><option value="">—</option>${subOpts}</select></div>
+          <div class="col"><label>Credit</label><input ${dis} type="number" value="${ch.gold}" onchange="editC('${ch.id}','gold',+this.value)"></div>
+          <div class="col" style="justify-content:flex-end">${ed?`<button class="sm primary" onclick="openLevelUp('${ch.id}')" ${ch.level>=10?'disabled':''}>⮝ Level Up${ch.level<10?' → '+(ch.level+1):' (max)'}</button>`:''}</div>
+        </div>
+        <div class="statbar">
+          <div class="statbox"><div class="k">Evasion</div><div class="v">${eff.evasion}</div></div>
+          <div class="statbox"><div class="k">Major</div><div class="v">${eff.major}</div></div>
+          <div class="statbox"><div class="k">Severe</div><div class="v">${eff.severe}</div></div>
+          <div class="statbox"><div class="k">Armor</div><div class="v">${eff.armormax}</div></div>
+        </div>
+        <div class="muted" style="font-size:11px">computed from base + equipment${ch.armorItem?' (thresholds = level + armor base)':''}</div>
+        <details><summary class="muted" style="font-size:12px">base stats (used when no armor equipped)</summary>
+          <div class="grid4" style="margin-top:6px">
+            <div class="col"><label>Evasion base</label><input ${dis} type="number" value="${ch.evasion}" onchange="editC('${ch.id}','evasion',+this.value)"></div>
+            <div class="col"><label>Major base</label><input ${dis} type="number" value="${ch.major}" onchange="editC('${ch.id}','major',+this.value)"></div>
+            <div class="col"><label>Severe base</label><input ${dis} type="number" value="${ch.severe}" onchange="editC('${ch.id}','severe',+this.value)"></div>
+            <div class="col"><label>Armor base</label><input ${dis} type="number" value="${ch.armormax}" onchange="editC('${ch.id}','armormax',+this.value)"></div>
+          </div></details>
+
+        <div class="shsub">Traits</div>
+        <div class="grid3">${TRAITS.map(t=>{const marked=ch.markedTraits&&ch.markedTraits.includes(t);
+          return `<div class="traitbox ${marked?'marked':''}"><label>${cap(t)}${marked?' •':''}</label><br>
+            <input ${dis} type="number" value="${ch[t]}" onchange="editC('${ch.id}','${t}',+this.value)"></div>`;}).join('')}</div>
+
+        <div class="shsub">Resources</div>
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div style="flex:1;min-width:0"><label>HP (mark on damage)</label><div class="pips">${pips(ch,'hp','hpmax','hp',ed)}</div></div>
+          ${ed?`<button class="sm" onclick="dmg('${ch.id}')">take damage…</button>`:''}
+        </div>
+        <div><label>Stress</label><div class="pips">${pips(ch,'stress','stressmax','st',ed)}</div></div>
+        <div><label>Hope (max 6)</label><div class="pips">${pips(ch,'hope','__6','ho',ed)}</div></div>
+        <div><label>Dread (gauge of ${ch.dreadmax||8})</label><div class="pips">${pips(ch,'dread','dreadmax','dr',ed)}</div></div>
+        <div><label>Armor slots (${eff.armormax})</label><div class="pips">${pipsN(ch,'armor',eff.armormax,'ar',ed)}</div></div>
+
+        <div class="shsub">Story</div>
+        <div class="col"><label>Notes</label><textarea ${dis} rows="3" onchange="editC('${ch.id}','notes',this.value)">${esc(ch.notes)}</textarea></div>
+        <div class="col"><label>Troubles (Dread scars — GM spends a Fear to invoke for disadvantage)</label><textarea ${dis} rows="3" onchange="editC('${ch.id}','traumas',this.value)" placeholder="one Trouble per line — e.g. The Dark Talks Back">${esc(ch.traumas)}</textarea></div>
+      </section>
+
+      <section class="sh-sec sh-kit"><h5>Items &amp; Skills</h5>
+        <div class="col"><label>Experiences (+2, spend Hope to use)</label>
+          <input ${dis} value="${esc(ch.experiences)}" onchange="editC('${ch.id}','experiences',this.value)" placeholder="e.g. Silver-tongued +2"></div>
+        ${equipmentSection(ch,ed)}
+        ${featureCards(ch)}
+        <div class="row" style="justify-content:space-between;align-items:center;margin-top:4px">
+          <h3 style="color:var(--gold);margin:0">Domain Cards — Loadout <span class="muted" style="font-size:12px">(${ch.loadout.length}/${LOADOUT_MAX})</span></h3>
+          <span>${ed&&cls?`<button class="sm" onclick="openCardPicker('${ch.id}','loadout')">+ add card</button>`:''} <button class="sm" onclick="openVault('${ch.id}')">🗃 Vault (${ch.vault.length})</button></span>
+        </div>
+        <div class="cardgrid">${ch.loadout.map(k=>domainCardHTML(findCard(k),ch,ed,'loadout')).join('')}</div>
+        ${ch.loadout.length===0?`<p class="muted" style="font-size:12px;margin:0">No domain cards yet.${cls?'':' Choose a class first.'}</p>`:''}
+      </section>
+
     </div>
-    <div class="grid3" style="margin-top:6px">
-      <div class="col"><label>Subclass</label><select ${dis} onchange="editC('${ch.id}','subclass',this.value)"><option value="">—</option>${subOpts}</select></div>
-      <div class="col"><label>Credit</label><input ${dis} type="number" value="${ch.gold}" onchange="editC('${ch.id}','gold',+this.value)"></div>
-      <div class="col" style="justify-content:flex-end">${ed?`<button class="sm primary" onclick="openLevelUp('${ch.id}')" ${ch.level>=10?'disabled':''}>⮝ Level Up${ch.level<10?' → '+(ch.level+1):' (max)'}</button>`:''}</div>
-    </div>
-    <div class="statbar" style="margin-top:10px">
-      <div class="statbox"><div class="k">Evasion</div><div class="v">${eff.evasion}</div></div>
-      <div class="statbox"><div class="k">Major</div><div class="v">${eff.major}</div></div>
-      <div class="statbox"><div class="k">Severe</div><div class="v">${eff.severe}</div></div>
-      <div class="statbox"><div class="k">Armor</div><div class="v">${eff.armormax}</div></div>
-    </div>
-    <div class="muted" style="font-size:11px;margin-top:3px">computed from base + equipment${ch.armorItem?' (thresholds = level + armor base)':''}</div>
-    <hr>
-    <div class="grid3">${TRAITS.map(t=>{const marked=ch.markedTraits&&ch.markedTraits.includes(t);
-      return `<div class="traitbox ${marked?'marked':''}"><label>${cap(t)}${marked?' •':''}</label><br>
-        <input ${dis} type="number" value="${ch[t]}" onchange="editC('${ch.id}','${t}',+this.value)"></div>`;}).join('')}</div>
-    <hr>
-    <div class="row" style="justify-content:space-between;align-items:flex-start">
-      <div><label>HP (mark on damage)</label><div class="pips">${pips(ch,'hp','hpmax','hp',ed)}</div></div>
-      ${ed?`<button class="sm" onclick="dmg('${ch.id}')">take damage…</button>`:''}
-    </div>
-    <div style="margin-top:8px"><label>Stress</label><div class="pips">${pips(ch,'stress','stressmax','st',ed)}</div></div>
-    <div style="margin-top:8px"><label>Hope (max 6)</label><div class="pips">${pips(ch,'hope','__6','ho',ed)}</div></div>
-      <div style="margin-top:8px"><label>Dread (gauge of ${ch.dreadmax||8})</label><div class="pips">${pips(ch,'dread','dreadmax','dr',ed)}</div></div>
-    <div style="margin-top:8px"><label>Armor slots (${eff.armormax})</label><div class="pips">${pipsN(ch,'armor',eff.armormax,'ar',ed)}</div></div>
-    <details style="margin-top:8px"><summary class="muted" style="font-size:12px">base stats (used when no armor equipped)</summary>
-      <div class="grid4" style="margin-top:6px">
-        <div class="col"><label>Evasion base</label><input ${dis} type="number" value="${ch.evasion}" onchange="editC('${ch.id}','evasion',+this.value)"></div>
-        <div class="col"><label>Major base</label><input ${dis} type="number" value="${ch.major}" onchange="editC('${ch.id}','major',+this.value)"></div>
-        <div class="col"><label>Severe base</label><input ${dis} type="number" value="${ch.severe}" onchange="editC('${ch.id}','severe',+this.value)"></div>
-        <div class="col"><label>Armor base</label><input ${dis} type="number" value="${ch.armormax}" onchange="editC('${ch.id}','armormax',+this.value)"></div>
-      </div></details>
-    <div class="col" style="margin-top:8px"><label>Experiences (+2, spend Hope to use)</label>
-      <input ${dis} value="${esc(ch.experiences)}" onchange="editC('${ch.id}','experiences',this.value)" placeholder="e.g. Silver-tongued +2"></div>
-    <div class="col" style="margin-top:6px"><label>Notes</label><textarea ${dis} rows="2" onchange="editC('${ch.id}','notes',this.value)">${esc(ch.notes)}</textarea></div>
-      <div class="col" style="margin-top:6px"><label>Troubles (Dread scars — GM spends a Fear to invoke for disadvantage)</label><textarea ${dis} rows="2" onchange="editC('${ch.id}','traumas',this.value)" placeholder="one Trouble per line — e.g. The Dark Talks Back">${esc(ch.traumas)}</textarea></div>
+  </div>
   `;
-  h+=equipmentSection(ch,ed);
-  h+=featureCards(ch);
-  h+=`<hr><div class="row" style="justify-content:space-between"><h3 style="color:var(--gold)">Domain Cards — Loadout <span class="muted" style="font-size:12px">(${ch.loadout.length}/${LOADOUT_MAX})</span></h3>
-    <span>${ed&&cls?`<button class="sm" onclick="openCardPicker('${ch.id}','loadout')">+ add card</button>`:''} <button class="sm" onclick="openVault('${ch.id}')">🗃 Vault (${ch.vault.length})</button></span></div>`;
-  h+=`<div class="cardgrid">`+ch.loadout.map(k=>domainCardHTML(findCard(k),ch,ed,'loadout')).join('')+`</div>`;
-  if(ch.loadout.length===0)h+=`<p class="muted" style="font-size:12px">No domain cards yet.${cls?'':' Choose a class first.'}</p>`;
-  h+=`</div>`;
   return h;
 }
 function equipmentSection(ch,ed){
@@ -1386,8 +1442,8 @@ function equipCardHTML(e,ch,ed,slot,kind){
   if(kind==='weapon')meta=[e.trait,e.range,(e.damageDice+(e.damageBonus?'+'+e.damageBonus:'')+' '+(e.damageType||'phy')),e.burden];
   else if(kind==='armor')meta=['Major '+e.baseMajor,'Severe '+e.baseSevere,'Score '+e.baseScore];
   else meta=[e.category||'Item'];
-  return `<div class="gcard eq"><div class="top"><span class="nm">${esc(e.name)}</span><span class="badge eqp">equipped</span></div>
-    <div class="meta">${meta.filter(Boolean).map(m=>`<span class="badge">${esc(m)}</span>`).join('')}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
+  return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span class="badge eqp">equipped</span></div>
+    <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${meta.filter(Boolean).map(m=>`<span class="badge">${esc(m)}</span>`).join('')}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
     ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}
     ${ed?`<div class="acts"><button class="xs danger" onclick="unequip('${ch.id}','${slot}')">unequip</button></div>`:''}
   </div>`;
@@ -1463,13 +1519,37 @@ function featureCards(ch){
       <div class="meta">${c.meta.map(m=>`<span class="badge">${esc(m)}</span>`).join('')}</div>
       <div class="txt">${esc(c.txt)}</div></div>`).join('')+`</div>`;
 }
+/* ---- colour-coding for cards ----
+   One accent colour per PulpHeart domain, plus one per equipment kind. Hues are
+   spread far enough apart to stay distinguishable at a glance on the dark board,
+   and each is bright enough to read as a title colour. Unknown names fall back to
+   the neutral line colour, so adding a domain never breaks the sheet. */
+const DOMAIN_COLOR={
+  'Arsenal':'#c0524a',        // guns and violence — red
+  'Tech':'#3fa3b8',           // gadgets — cyan
+  'Artefacts':'#9a63d0',      // occult relics — violet
+  'Field':'#5aa46a',          // fieldcraft — green
+  'Investigation':'#d2803a',  // legwork — orange
+  'Research':'#4a83c9'        // the lab and the library — blue
+};
+const KIND_COLOR={armor:'#7f93a8', weapon:'#c0524a', item:'#c8a24a'};
+function hexRGBA(hex,a){const n=parseInt(String(hex||'').slice(1),16);
+  if(isNaN(n))return 'rgba(58,47,38,'+a+')';
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+/* returns the inline style + data-dc marker a card needs, or '' when uncoloured */
+function accentAttr(color){
+  if(!color)return '';
+  return ` data-dc style="--dc:${color};--dcw:${hexRGBA(color,0.30)}"`;
+}
+function domainColor(d){return DOMAIN_COLOR[d]||null;}
+
 function domainCardHTML(c,ch,ed,where){
   if(!c)return '';
   const fullKey=cardKey(c);
   const k=fullKey.replace(/'/g,"\\'");
   const act=(ch.activeCards||{})[fullKey];
   const typeBadge=c.type==='Spell'||c.type==='Grimoire'?'badge spell':'badge feat';
-  return `<div class="gcard${act?' activeCard':''}"><div class="top"><span class="nm">${esc(c.name)}</span><span>${act?'<span class="badge feat">ACTIVE</span> ':''}<span class="badge lvl">Lv ${c.level}</span></span></div>
+  return `<div class="gcard${act?' activeCard':''}"${accentAttr(domainColor(c.domain))}><div class="top"><span class="nm">${esc(c.name)}</span><span>${act?'<span class="badge feat">ACTIVE</span> ':''}<span class="badge lvl">Lv ${c.level}</span></span></div>
     <div class="meta"><span class="badge dom">${esc(c.domain)}</span><span class="${typeBadge}">${esc(c.type||'Ability')}</span><span class="badge">Recall ${c.recall||0}</span></div>
     <div class="txt">${esc(c.text)}</div>
     ${ed?`<div class="acts">
