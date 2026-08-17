@@ -212,7 +212,7 @@
      the old neutral look if they're absent. ---- */
   .gcard[data-dc]{border-left:4px solid var(--dc);border-color:var(--dc) var(--line) var(--line) var(--dc)}
   .gcard[data-dc] .top{background:linear-gradient(90deg,var(--dcw),#2a2118 78%)}
-  .gcard[data-dc] .top .nm{color:var(--dc);filter:brightness(1.35)}
+  .gcard[data-dc] .top .nm{color:var(--dcnm,var(--dc))}
   .gcard[data-dc]:hover{box-shadow:0 0 0 1px var(--dc),0 4px 14px rgba(0,0,0,.45)}
   .gcard .meta{font-size:11px;color:var(--dim);display:flex;gap:6px;flex-wrap:wrap;padding:5px 10px}
   .gcard .txt{padding:8px 10px;font-size:12.5px;white-space:pre-wrap;flex:1}
@@ -221,7 +221,25 @@
   /* domain / kind badges are filled with the card's accent colour (--dc, set inline);
      they fall back to the old gold outline when a card has no accent */
   .badge.dom,.badge.kind{border-color:var(--dc,var(--gold));color:var(--dc,var(--gold));font-weight:700;letter-spacing:.3px}
-  .gcard[data-dc] .badge.dom,.gcard[data-dc] .badge.kind{background:var(--dc);color:#15110f}
+  .gcard[data-dc] .badge.dom,.gcard[data-dc] .badge.kind{background:var(--dc);color:var(--dctxt,#15110f)}
+  /* class badge is its own colour channel, independent of the card accent, so a
+     multiclassed sheet shows at a glance which class each feature came from */
+  .badge.cls{border-color:var(--cc,var(--dim));color:var(--cc,var(--dim));font-weight:700;letter-spacing:.3px}
+  .badge.mc{border-color:#e0952f;color:#15110f;background:#e0952f;font-weight:700;letter-spacing:.3px}
+  .gcard.mcard{border-style:dashed}
+  .gcard.mcard .top{border-bottom-style:dashed}
+  /* subclass ladder: the left border thickens as the tier climbs, so the steps
+     read even where the lightness difference is subtle */
+  .gcard.t1[data-dc]{border-left-width:4px}
+  .gcard.t2[data-dc]{border-left-width:7px}
+  .gcard.t3[data-dc]{border-left-width:10px}
+  /* legend strip next to the Feature Cards heading */
+  .lgdbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .lgd{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--dim);white-space:nowrap}
+  .lgd i{width:9px;height:9px;border-radius:2px;display:inline-block}
+  /* class chips in the sheet header, tinted with the class colour */
+  .tag.clstag{border-color:var(--cc,var(--line));color:var(--cc,var(--ink));font-weight:700;letter-spacing:.3px}
+  .tag.mctag{border-style:dashed}
   .badge.lvl{border-color:#6a8fb0;color:#9fc4e0}
   .badge.spell{border-color:var(--fear);color:#c89df0}
   .badge.feat{border-color:var(--ok);color:#8fd8a0}
@@ -1351,6 +1369,8 @@ function renderOneSheet(ch){
     <div class="row" style="justify-content:space-between">
       <input ${dis} style="font-size:17px;font-weight:600;flex:1" value="${esc(ch.name)}" onchange="editC('${ch.id}','name',this.value)">
       ${own} <span class="tag">Lv ${ch.level}</span> <span class="tag">Prof ${ch.proficiency}</span>
+      ${ch.cls?`<span class="tag clstag"${classColor(ch.cls)?` style="--cc:${classColor(ch.cls)}"`:''}>${esc(ch.cls)}</span>`:''}
+      ${ch.multiclass?`<span class="tag clstag mctag"${classColor(ch.multiclass)?` style="--cc:${classColor(ch.multiclass)}"`:''} title="multiclass — also draws domains from this class">⚑ ${esc(ch.multiclass)}</span>`:''}
       ${!ed&&ME.peer&&!ME.isHost?`<button class="xs" onclick="claimChar('${ch.id}')" title="make this your character (e.g. after restoring a saved session)">claim</button>`:''}
       ${ed&&ch.owner===ME.id?`<button class="xs" onclick="releaseChar('${ch.id}')" title="free this character so another player can claim it">release</button>`:''}
       ${ed?`<button class="sm danger" onclick="delChar('${ch.id}')">✕</button>`:''}
@@ -1497,27 +1517,46 @@ function customItem(id){
   const ch=copyChar(id); ch.gear=ch.gear||[]; ch.gear.push({name,category:'Custom',text,evasionMod:ev,majorMod:maj,severeMod:sev,scoreMod:score});
   dispatch({kind:'upchar',char:ch});
 }
-function featureCards(ch){
+/* Collects a character's feature cards. Each card is tagged with `cat` (which
+   drives the accent colour) and `cls` (which class it came from, if any) so the
+   renderer can colour both channels. */
+function featureCardList(ch){
   let cards=[];
-  if(SRD.ancestries[ch.ancestry]) SRD.ancestries[ch.ancestry].features.forEach(f=>cards.push({nm:f.name,meta:[ch.ancestry+' ancestry'],txt:f.text}));
-  if(SRD.communities[ch.community]){const f=SRD.communities[ch.community].feature; cards.push({nm:f.name,meta:[ch.community+' community'],txt:f.text});}
+  if(SRD.ancestries[ch.ancestry]) SRD.ancestries[ch.ancestry].features.forEach(f=>cards.push({nm:f.name,meta:[ch.ancestry+' ancestry'],txt:f.text,cat:'ancestry',label:'Ancestry'}));
+  if(SRD.communities[ch.community]){const f=SRD.communities[ch.community].feature; cards.push({nm:f.name,meta:[ch.community+' community'],txt:f.text,cat:'community',label:'Community'});}
   const cls=SRD.classes[ch.cls];
   if(cls){
-    if(cls.hopeFeature)cards.push({nm:cls.hopeFeature.name,meta:[ch.cls,'Hope feature'],txt:cls.hopeFeature.text});
-    (cls.features||[]).forEach(f=>cards.push({nm:f.name,meta:[ch.cls],txt:f.text}));
+    if(cls.hopeFeature)cards.push({nm:cls.hopeFeature.name,meta:['Hope feature'],txt:cls.hopeFeature.text,cat:'class',label:'Class',cls:ch.cls});
+    (cls.features||[]).forEach(f=>cards.push({nm:f.name,meta:[],txt:f.text,cat:'class',label:'Class',cls:ch.cls}));
     const sub=cls.subclasses.find(s=>s.name===ch.subclass);
     if(sub){
-      if(sub.spellcast)cards.push({nm:'Domain Trait',meta:[sub.name],txt:'This subclass casts with '+sub.spellcast+'.'});
-      (sub.foundation||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name,'Foundation'],txt:f.text}));
-      if(ch.subclassTier>=2)(sub.specialization||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name,'Specialization'],txt:f.text}));
-      if(ch.subclassTier>=3)(sub.mastery||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name,'Mastery'],txt:f.text}));
+      if(sub.spellcast)cards.push({nm:'Domain Trait',meta:[sub.name],txt:'This subclass casts with '+sub.spellcast+'.',cat:'foundation',label:'Foundation',cls:ch.cls});
+      (sub.foundation||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'foundation',label:'Foundation',cls:ch.cls}));
+      if(ch.subclassTier>=2)(sub.specialization||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'specialization',label:'Specialization',cls:ch.cls}));
+      if(ch.subclassTier>=3)(sub.mastery||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'mastery',label:'Mastery',cls:ch.cls}));
     }
   }
+  return cards;
+}
+function featureCards(ch){
+  const cards=featureCardList(ch);
   if(!cards.length)return '';
-  return `<hr><h3 style="color:var(--gold)">Feature Cards</h3><div class="cardgrid">`+
-    cards.map(c=>`<div class="gcard"><div class="top"><span class="nm">${esc(c.nm)}</span><span class="badge feat">feature</span></div>
-      <div class="meta">${c.meta.map(m=>`<span class="badge">${esc(m)}</span>`).join('')}</div>
-      <div class="txt">${esc(c.txt)}</div></div>`).join('')+`</div>`;
+  const legend=[['ancestry','Ancestry'],['community','Community'],['class','Class'],
+                ['foundation','Foundation'],['specialization','Specialization'],['mastery','Mastery']]
+    .filter(([k])=>cards.some(c=>c.cat===k))
+    .map(([k,t])=>{const c=cards.find(x=>x.cat===k);
+      return `<span class="lgd"><i style="background:${featureColor(k,c&&c.cls)}"></i>${t}</span>`;}).join('');
+  return `<hr><div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="color:var(--gold);margin:0">Feature Cards</h3><span class="lgdbar">${legend}</span></div>
+    <div class="cardgrid">`+
+    cards.map(c=>{
+      const cc=classColor(c.cls);
+      const mc=c.cls&&ch.multiclass&&String(c.cls).toUpperCase()===String(ch.multiclass).toUpperCase();
+      const tier=c.cat==='foundation'?' t1':c.cat==='specialization'?' t2':c.cat==='mastery'?' t3':'';
+      return `<div class="gcard${tier}${mc?' mcard':''}"${accentAttr(featureColor(c.cat,c.cls))}>
+        <div class="top"><span class="nm">${esc(c.nm)}</span><span class="badge dom">${esc(c.label)}</span></div>
+        <div class="meta">${c.cls?`<span class="badge cls"${cc?` style="--cc:${cc}"`:''}>${esc(c.cls)}</span>`:''}${mc?'<span class="badge mc">multiclass</span>':''}${c.meta.map(m=>`<span class="badge">${esc(m)}</span>`).join('')}</div>
+        <div class="txt">${esc(c.txt)}</div></div>`;}).join('')+`</div>`;
 }
 /* ---- colour-coding for cards ----
    One accent colour per PulpHeart domain, plus one per equipment kind. Hues are
@@ -1533,13 +1572,62 @@ const DOMAIN_COLOR={
   'Research':'#4a83c9'        // the lab and the library — blue
 };
 const KIND_COLOR={armor:'#7f93a8', weapon:'#c0524a', item:'#c8a24a'};
+/* Class, subclass and its specialisations are one progression from one source, so
+   they share one hue — the character's class colour — and separate by intensity
+   instead of by unrelated hues. A MARINE's whole kit reads as reds, an OCCULTIST's
+   as violets, and a multiclass sheet visibly splits into two families.
+   Ancestry and community sit outside that chain, so they keep their own colours. */
+const CLASS_COLOR={
+  'MARINE':'#b5564a', 'OPERATIVE':'#4a90c9', 'WITCHFINDER':'#c9a227',
+  'OCCULTIST':'#9a63d0', 'FRINGE SCIENTIST':'#3fb8a0', 'SPECIALIST':'#c07fb0'
+};
+function classColor(c){return CLASS_COLOR[String(c||'').toUpperCase()]||null;}
+/* mix a hex toward white (amt>0) or black (amt<0) */
+function shade(hex,amt){
+  const n=parseInt(String(hex||'').slice(1),16); if(isNaN(n))return hex;
+  let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  const t=amt<0?0:255,p=Math.abs(amt);
+  r=Math.round((t-r)*p+r); g=Math.round((t-g)*p+g); b=Math.round((t-b)*p+b);
+  return '#'+(((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1));
+}
+/* where a feature sits on the class ladder: darker = closer to the base class,
+   brighter = further up the subclass. Tier also drives the left-border weight in
+   CSS, so the steps stay legible without relying on lightness alone. */
+const CLASS_TIER_STEP={class:-0.30, foundation:0, specialization:0.20, mastery:0.38};
+const FEATURE_COLOR={          // fallbacks + the two non-class sources
+  ancestry:'#9aae52',          // heritage — sage
+  community:'#4fb39a',         // where you're from — teal
+  class:'#6b78d4', foundation:'#8f7ad0', specialization:'#a99adc', mastery:'#c3bde8'
+};
+/* the accent a feature card should use: the class ladder when we know the class,
+   otherwise the neutral fallback ramp above */
+function featureColor(cat,cls){
+  const base=classColor(cls);
+  if(base&&CLASS_TIER_STEP[cat]!==undefined)return shade(base,CLASS_TIER_STEP[cat]);
+  return FEATURE_COLOR[cat]||null;
+}
 function hexRGBA(hex,a){const n=parseInt(String(hex||'').slice(1),16);
   if(isNaN(n))return 'rgba(58,47,38,'+a+')';
   return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+/* relative luminance, used to decide whether text on top of an accent should be
+   ink or paper — the class ladder's darkest steps would otherwise put near-black
+   text on a near-black badge */
+function lumOf(hex){const n=parseInt(String(hex||'').slice(1),16); if(isNaN(n))return 1;
+  const f=v=>{v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
+  return 0.2126*f((n>>16)&255)+0.7152*f((n>>8)&255)+0.0722*f(n&255);}
 /* returns the inline style + data-dc marker a card needs, or '' when uncoloured */
 function accentAttr(color){
   if(!color)return '';
-  return ` data-dc style="--dc:${color};--dcw:${hexRGBA(color,0.30)}"`;
+  const l=lumOf(color);
+  // pick whichever of ink/paper actually contrasts better against this accent —
+  // a fixed lightness threshold picks badly for mid-tones, which is most of the
+  // class ladder's middle steps
+  const cr=(a,b)=>{const L=Math.max(a,b),D=Math.min(a,b);return (L+0.05)/(D+0.05);};
+  const INK=lumOf('#15110f'), PAPER=lumOf('#ece4d6');
+  const txt=cr(l,INK)>=cr(l,PAPER)?'#15110f':'#ece4d6';
+  // the title needs its own, always-legible version of the accent
+  const nm=l<0.18?shade(color,0.42):l<0.30?shade(color,0.26):color;
+  return ` data-dc style="--dc:${color};--dcw:${hexRGBA(color,0.30)};--dctxt:${txt};--dcnm:${nm}"`;
 }
 function domainColor(d){return DOMAIN_COLOR[d]||null;}
 
