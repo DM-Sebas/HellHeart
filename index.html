@@ -1284,7 +1284,8 @@ function blankChar(id,name){return{ id,name:name||'New Hero',owner:id,playerName
   ancestry:'',community:'',cls:'',subclass:'',level:1,proficiency:1,
   agility:0,strength:0,finesse:0,instinct:0,presence:0,knowledge:0,markedTraits:[],
   evasion:10,major:6,severe:13, hp:0,hpmax:6,stress:0,stressmax:6,hope:2,armor:0,armormax:3,
-  gold:0,experiences:'',notes:'',dread:0,dreadmax:8,traumas:'', subclassTier:1, multiclass:null,
+  gold:0,experiences:'',notes:'',dread:0,dreadmax:8,traumas:'', subclassTier:1,
+  multiclass:null, mcDomain:null, mcSubclass:null,   // SRD p.43: one domain, one subclass foundation
   loadout:[],vault:[], advances:[], activeCards:{},
   armorItem:null, primary:null, secondary:null, gear:[] };}
 function makeChar(id,name){STATE.characters[id]=blankChar(id,name);}
@@ -1294,7 +1295,48 @@ function nameEq(a,b){const n=s=>(s||'').trim().toLowerCase().normalize('NFD').re
 function activeCharId(){const m=Object.values(STATE.characters).find(c=>c.owner===ME.id); if(m)return m.id; const f=Object.values(STATE.characters)[0]; return f?f.id:null;}
 function cardKey(c){return c.domain+'|'+c.name;}
 function findCard(key){const i=key.indexOf('|'); const d=key.slice(0,i),n=key.slice(i+1); return (SRD.domains[d]||[]).find(c=>c.name===n);}
-function accessibleDomains(ch){let ds=[]; if(SRD.classes[ch.cls])ds=ds.concat(SRD.classes[ch.cls].domains); if(ch.multiclass&&SRD.classes[ch.multiclass])ds=ds.concat(SRD.classes[ch.multiclass].domains); return [...new Set(ds)];}
+/* ---- domain access (SRD p.43, Multiclassing) ----
+   Multiclassing grants access to exactly ONE domain of the second class, not both,
+   and cards taken from it are capped at half your level rounded up. Your own class's
+   domains stay uncapped. Everything below reads from that rule. */
+function classDomains(ch){return SRD.classes[ch.cls]?SRD.classes[ch.cls].domains.slice():[];}
+/* Characters multiclassed before v4 have no mcDomain/mcSubclass, because the old code
+   just granted every domain of the second class. Rather than silently revoking their
+   card access, fall back to that class's first domain — the sheet exposes selects to
+   correct both fields. */
+function mcDomainOf(ch){
+  if(!ch.multiclass)return null;
+  if(ch.mcDomain)return ch.mcDomain;
+  const c=SRD.classes[ch.multiclass];
+  return (c&&c.domains&&c.domains[0])||null;
+}
+function mcSubclassOf(ch){
+  if(!ch.multiclass)return null;
+  if(ch.mcSubclass)return ch.mcSubclass;
+  const c=SRD.classes[ch.multiclass];
+  return (c&&c.subclasses&&c.subclasses[0]&&c.subclasses[0].name)||null;
+}
+function mcCardCap(ch){return Math.ceil((ch.level||1)/2);}   // "half your level, rounded up"
+/* every domain a character can draw from — used for labels and empty-state checks */
+function accessibleDomains(ch){const d=classDomains(ch); const m=mcDomainOf(ch);
+  if(m&&!d.includes(m))d.push(m); return d;}
+/* the actual card pool, honouring the per-domain level cap. `have` is a Set of keys
+   already owned, which are filtered out. */
+function availableCards(ch,have){
+  have=have||new Set(); const out=[];
+  const push=(dom,cap)=>(SRD.domains[dom]||[]).forEach(c=>{
+    if(c.level<=cap&&!have.has(cardKey(c)))out.push(c);});
+  classDomains(ch).forEach(d=>push(d,ch.level));
+  const m=mcDomainOf(ch); if(m)push(m,mcCardCap(ch));
+  out.sort((a,b)=>a.level-b.level||a.name.localeCompare(b.name));
+  return out;
+}
+/* human-readable description of what the picker is offering */
+function poolLabel(ch){
+  const parts=[classDomains(ch).join(' / ')+' ≤ '+ch.level];
+  const m=mcDomainOf(ch); if(m)parts.push(m+' ≤ '+mcCardCap(ch)+' (multiclass)');
+  return parts.filter(Boolean).join(' · ');
+}
 function copyChar(id){const ch=STATE.characters[id]; return ch?JSON.parse(JSON.stringify(ch)):null;}
 
 function effStats(ch){
@@ -1370,7 +1412,7 @@ function renderOneSheet(ch){
       <input ${dis} style="font-size:17px;font-weight:600;flex:1" value="${esc(ch.name)}" onchange="editC('${ch.id}','name',this.value)">
       ${own} <span class="tag">Lv ${ch.level}</span> <span class="tag">Prof ${ch.proficiency}</span>
       ${ch.cls?`<span class="tag clstag"${classColor(ch.cls)?` style="--cc:${classColor(ch.cls)}"`:''}>${esc(ch.cls)}</span>`:''}
-      ${ch.multiclass?`<span class="tag clstag mctag"${classColor(ch.multiclass)?` style="--cc:${classColor(ch.multiclass)}"`:''} title="multiclass — also draws domains from this class">⚑ ${esc(ch.multiclass)}</span>`:''}
+      ${ch.multiclass?`<span class="tag clstag mctag"${classColor(ch.multiclass)?` style="--cc:${classColor(ch.multiclass)}"`:''} title="Multiclass${ch.mcDomain?' — '+esc(ch.mcDomain)+' cards up to level '+mcCardCap(ch)+' (half your level, rounded up)':''}${ch.mcSubclass?' · foundation from '+esc(ch.mcSubclass):''}">⚑ ${esc(ch.multiclass)}${ch.mcDomain?' · '+esc(ch.mcDomain):''}</span>`:''}
       ${!ed&&ME.peer&&!ME.isHost?`<button class="xs" onclick="claimChar('${ch.id}')" title="make this your character (e.g. after restoring a saved session)">claim</button>`:''}
       ${ed&&ch.owner===ME.id?`<button class="xs" onclick="releaseChar('${ch.id}')" title="free this character so another player can claim it">release</button>`:''}
       ${ed?`<button class="sm danger" onclick="delChar('${ch.id}')">✕</button>`:''}
@@ -1388,6 +1430,16 @@ function renderOneSheet(ch){
           <div class="col"><label>Credit</label><input ${dis} type="number" value="${ch.gold}" onchange="editC('${ch.id}','gold',+this.value)"></div>
           <div class="col" style="justify-content:flex-end">${ed?`<button class="sm primary" onclick="openLevelUp('${ch.id}')" ${ch.level>=10?'disabled':''}>⮝ Level Up${ch.level<10?' → '+(ch.level+1):' (max)'}</button>`:''}</div>
         </div>
+        ${ch.multiclass&&SRD.classes[ch.multiclass]?`
+        <div class="grid3">
+          <div class="col"><label>Multiclass</label><input disabled value="${esc(ch.multiclass)}"></div>
+          <div class="col"><label>MC domain (≤ ${mcCardCap(ch)})</label>
+            <select ${dis} onchange="editC('${ch.id}','mcDomain',this.value)">
+              ${(SRD.classes[ch.multiclass].domains||[]).map(d=>`<option ${d===mcDomainOf(ch)?'selected':''}>${esc(d)}</option>`).join('')}</select></div>
+          <div class="col"><label>MC subclass (foundation)</label>
+            <select ${dis} onchange="editC('${ch.id}','mcSubclass',this.value)">
+              ${(SRD.classes[ch.multiclass].subclasses||[]).map(s=>`<option ${s.name===mcSubclassOf(ch)?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+        </div>`:''}
         <div class="statbar">
           <div class="statbox"><div class="k">Evasion</div><div class="v">${eff.evasion}</div></div>
           <div class="statbox"><div class="k">Major</div><div class="v">${eff.major}</div></div>
@@ -1534,6 +1586,18 @@ function featureCardList(ch){
       (sub.foundation||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'foundation',label:'Foundation',cls:ch.cls}));
       if(ch.subclassTier>=2)(sub.specialization||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'specialization',label:'Specialization',cls:ch.cls}));
       if(ch.subclassTier>=3)(sub.mastery||[]).forEach(f=>cards.push({nm:f.name,meta:[sub.name],txt:f.text,cat:'mastery',label:'Mastery',cls:ch.cls}));
+    }
+  }
+  /* Multiclass (SRD p.43) grants the second class's class feature and the foundation
+     card of ONE of its subclasses — never its specialization or mastery, and never its
+     Hope feature. These carry cls=multiclass, so the renderer marks them. */
+  const mcls=ch.multiclass&&SRD.classes[ch.multiclass];
+  if(mcls){
+    (mcls.features||[]).forEach(f=>cards.push({nm:f.name,meta:[],txt:f.text,cat:'class',label:'Class',cls:ch.multiclass}));
+    const msub=(mcls.subclasses||[]).find(s=>s.name===mcSubclassOf(ch));
+    if(msub){
+      if(msub.spellcast)cards.push({nm:'Domain Trait',meta:[msub.name],txt:'This subclass casts with '+msub.spellcast+'. If your two subclasses name different Spellcast traits, you choose which to apply on each Spellcast roll.',cat:'foundation',label:'Foundation',cls:ch.multiclass});
+      (msub.foundation||[]).forEach(f=>cards.push({nm:f.name,meta:[msub.name],txt:f.text,cat:'foundation',label:'Foundation',cls:ch.multiclass}));
     }
   }
   return cards;
@@ -1761,10 +1825,9 @@ function openCardPicker(id,dest){
   const ch=STATE.characters[id]; const doms=accessibleDomains(ch);
   if(!doms.length){alert('Choose a class first.');return;}
   const have=new Set([...ch.loadout,...ch.vault]);
-  let pool=[]; doms.forEach(d=>(SRD.domains[d]||[]).forEach(c=>{ if(c.level<=ch.level && !have.has(cardKey(c))) pool.push(c); }));
-  pool.sort((a,b)=>a.level-b.level||a.name.localeCompare(b.name));
+  const pool=availableCards(ch,have);
   const box=document.getElementById('genBox'); box.classList.add('wide');
-  box.innerHTML=`<h3 style="color:var(--gold)">Choose a domain card <span class="muted" style="font-size:12px">(${doms.join(' / ')}, level ≤ ${ch.level})</span></h3>
+  box.innerHTML=`<h3 style="color:var(--gold)">Choose a domain card <span class="muted" style="font-size:12px">(${poolLabel(ch)})</span></h3>
     <input id="cardSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterPicker()">
     <div id="pickerList" style="max-height:52vh;overflow:auto"></div>
     <div class="row" style="margin-top:10px;justify-content:flex-end"><button class="sm" onclick="closeGen()">Cancel</button></div>`;
@@ -1794,7 +1857,14 @@ function openLevelUp(id){
   window.__lvl={id,target,tier,td,used,sel:[]};
   const ach=[2,5,8].includes(target);
   const box=document.getElementById('genBox'); box.classList.remove('wide');
-  let opts=td.options.map((o,i)=>{let remain=(o.max||1)-(used[o.effect]||0); if(o.effect==='multiclass'&&multiTaken)remain=0; return {o,i,remain,cost:slotsCost(o.effect)};});
+  /* SRD p.43: multiclass crosses out this tier's "upgraded subclass" option (and every
+     other multiclass option, ever); taking the upgraded subclass crosses out this
+     tier's multiclass option. So within a tier the two are mutually exclusive. */
+  let opts=td.options.map((o,i)=>{
+    let remain=(o.max||1)-(used[o.effect]||0);
+    if(o.effect==='multiclass'&&(multiTaken||used['subclass']))remain=0;
+    if(o.effect==='subclass'&&used['multiclass'])remain=0;
+    return {o,i,remain,cost:slotsCost(o.effect)};});
   box.innerHTML=`<h3 style="color:var(--gold)">Level Up → ${target} <span class="muted" style="font-size:12px">(Tier ${tier})</span></h3>
     <div class="card" style="font-size:12px"><b>Automatic this level:</b><br>• Gain a new domain card (level ≤ ${target}).<br>
       ${ach?'• Tier benefit: +1 Proficiency, gain a new Experience (+2)'+(target>=5?', clear marked traits.':'.'):'• Increase damage thresholds (adjust base manually if no armor).'}</div>
@@ -1841,21 +1911,55 @@ function stepTraits(){
 function toggleTrait(t){const s=window.__tsel; const at=s.indexOf(t); if(at>=0)s.splice(at,1); else{if(s.length>=2){flash('Pick exactly two.');return;}s.push(t);}
   document.querySelectorAll('#tlist .opt').forEach(el=>el.classList.toggle('sel',s.includes(el.dataset.t))); document.getElementById('tConfirm').disabled=(s.length!==2);}
 function confirmTraits(){window.__tsel.forEach(t=>{work[t]+=1;(work.markedTraits=work.markedTraits||[]).push(t);}); closeGen(); processStep();}
+/* Multiclass (SRD p.43): choose an additional class, ONE of its domains, and gain its
+   class feature; then take the foundation card from one of its subclasses. */
 function stepMulti(){
-  const box=document.getElementById('genBox'); box.classList.remove('wide'); const others=CLASSES.filter(c=>c!==work.cls);
-  box.innerHTML=`<h3 style="color:var(--gold)">Multiclass</h3><p class="muted" style="font-size:12px">Pick a second class to gain its domains for card selection.</p>
-    <select id="mcSel" style="width:100%">${others.map(c=>`<option>${c}</option>`).join('')}</select>
+  const box=document.getElementById('genBox'); box.classList.remove('wide');
+  const others=CLASSES.filter(c=>c!==work.cls);
+  box.innerHTML=`<h3 style="color:var(--gold)">Multiclass</h3>
+    <p class="muted" style="font-size:12px">Choose an additional class, one of its domains, and the subclass whose foundation you take. You also gain the new class's feature. Cards from the multiclass domain are capped at half your level, rounded up (≤ ${mcCardCap(work)} at level ${work.level}).</p>
+    <div class="col" style="gap:8px;margin-top:8px">
+      <div class="col"><label>Class</label>
+        <select id="mcSel" style="width:100%" onchange="mcRefresh()">${others.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+      <div class="col"><label>Domain (pick one)</label><select id="mcDom" style="width:100%"></select></div>
+      <div class="col"><label>Subclass — you take its foundation</label><select id="mcSub" style="width:100%" onchange="mcRefresh(true)"></select></div>
+      <div class="muted" id="mcInfo" style="font-size:11.5px"></div>
+    </div>
     <div class="row" style="margin-top:10px;justify-content:flex-end"><button class="sm primary" onclick="confirmMulti()">Apply</button></div>`;
   document.getElementById('genModal').classList.add('show');
+  mcRefresh();
 }
-function confirmMulti(){work.multiclass=document.getElementById('mcSel').value; closeGen(); processStep();}
+/* repopulate domain/subclass selects for the chosen class; keepSub avoids resetting
+   the subclass when the user is only changing the subclass itself */
+function mcRefresh(keepSub){
+  const cl=document.getElementById('mcSel').value, c=SRD.classes[cl]; if(!c)return;
+  const dom=document.getElementById('mcDom'), sub=document.getElementById('mcSub');
+  if(!keepSub){
+    dom.innerHTML=(c.domains||[]).map(d=>`<option>${esc(d)}</option>`).join('');
+    sub.innerHTML=(c.subclasses||[]).map(s=>`<option>${esc(s.name)}</option>`).join('');
+  }
+  const s=(c.subclasses||[]).find(x=>x.name===sub.value);
+  const feats=(c.features||[]).map(f=>f.name);
+  const found=s?(s.foundation||[]).map(f=>f.name):[];
+  const mainSub=(SRD.classes[work.cls]||{subclasses:[]}).subclasses.find(x=>x.name===work.subclass);
+  const clash=s&&s.spellcast&&mainSub&&mainSub.spellcast&&s.spellcast!==mainSub.spellcast;
+  document.getElementById('mcInfo').innerHTML=
+    `Gains — class feature: <b>${feats.join(', ')||'—'}</b><br>Foundation: <b>${found.join(', ')||'—'}</b>`+
+    (s&&s.spellcast?`<br>Spellcast trait: <b>${esc(s.spellcast)}</b>`:'')+
+    (clash?`<br><span style="color:var(--gold)">Your subclasses name different Spellcast traits (${esc(mainSub.spellcast)} vs ${esc(s.spellcast)}) — RAW lets you choose which to apply on each Spellcast roll.</span>`:'');
+}
+function confirmMulti(){
+  work.multiclass=document.getElementById('mcSel').value;
+  work.mcDomain=document.getElementById('mcDom').value||null;
+  work.mcSubclass=document.getElementById('mcSub').value||null;
+  closeGen(); processStep();
+}
 function stepCard(){
   const ch=work; const doms=accessibleDomains(ch);
   if(!doms.length){flash('Pick a class to gain cards — skipped.'); processStep(); return;}
-  const have=new Set([...ch.loadout,...ch.vault]); let pool=[]; doms.forEach(d=>(SRD.domains[d]||[]).forEach(c=>{if(c.level<=ch.level&&!have.has(cardKey(c)))pool.push(c);}));
-  pool.sort((a,b)=>a.level-b.level||a.name.localeCompare(b.name));
+  const have=new Set([...ch.loadout,...ch.vault]); const pool=availableCards(ch,have);
   const box=document.getElementById('genBox'); box.classList.add('wide'); window.__pickerW={pool};
-  box.innerHTML=`<h3 style="color:var(--gold)">Gain a domain card <span class="muted" style="font-size:12px">(${doms.join(' / ')}, level ≤ ${ch.level})</span></h3>
+  box.innerHTML=`<h3 style="color:var(--gold)">Gain a domain card <span class="muted" style="font-size:12px">(${poolLabel(ch)})</span></h3>
     <input id="cardSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterPickerWork()"><div id="pickerList" style="max-height:52vh;overflow:auto"></div>`;
   document.getElementById('genModal').classList.add('show'); filterPickerWork();
 }
