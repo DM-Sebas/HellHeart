@@ -637,6 +637,7 @@
       <div class="row" style="margin:6px 0">
         <input id="envSetting" placeholder="setting, e.g. burning pirate ship in a storm" style="flex:1">
         <button class="sm primary" onclick="envAsk()">✨ ask Assistant</button>
+        <button class="sm" onclick="envAskFull()" title="entorno completo y reutilizable, va a la biblioteca">🏛 entorno completo</button>
       </div>
       <div id="envList"></div>
     </div>
@@ -821,7 +822,7 @@ function terrainStyle(id){
 }
 
 let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strokes:[], characters:{}, fear:0, floors:null, floorIdx:0, fog:{}, aspects:[],
-  npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], initRound:1, log:[], lastRoll:null };
+  npcLibrary:[], envLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], initRound:1, log:[], lastRoll:null };
 /* `socket` es el WebSocket vivo; `sock` el envoltorio con reintentos que lo creó.
    `peer` es un alias de socket que se conserva porque medio código pregunta
    `(ME.isHost||!ME.peer)` para decir "soy GM o estoy offline" — mantenerlo evita
@@ -914,7 +915,7 @@ catch(e){ LS_OK=false; }
 function lsGet(k){ if(!LS_OK)return null; try{ return localStorage.getItem(k); }catch(e){ LS_OK=false; return null; } }
 function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){ LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v7.9';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v9';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1409,7 +1410,30 @@ function applyFloorsFile(d){
       pts:x.pts.filter(pp=>Array.isArray(pp)&&pp.length>=2).map(pp=>[+pp[0]||0,+pp[1]||0])}));
     const aspects=(f.aspects||[]).filter(x=>x&&typeof x.text==='string').map(x=>({id:rid(4),
       r:Math.round(+x.r)||0,c:Math.round(+x.c)||0,text:String(x.text).slice(0,200),revealed:!!x.revealed}));
-    floors.push({id:f.id||rid(4),name:String(f.name||('Piso '+(fi+1))).slice(0,24),grid:g,tiles,edges,strokes,fog:{},aspects});
+    /* rooms (piezas, v8): antes se perdían al importar un mapa multi-piso — esta función
+       nunca las leía, así que un archivo preparado con encuentros/loot/entorno llegaba
+       vacío. cells/secret/revealed son claves "r,c" en string, igual que tiles. */
+    const cellKeyRe=/^\d+,\d+$/;
+    const rooms=(f.rooms||[]).filter(x=>x&&Array.isArray(x.cells)).map(x=>{
+      const e=(x.env&&typeof x.env==='object')?x.env:{};
+      return {id:rid(6), name:String(x.name||'Sala').slice(0,60),
+        color:/^#[0-9a-fA-F]{3,8}$/.test(x.color||'')?x.color:ROOM_COLORS[0],
+        cells:x.cells.filter(k=>typeof k==='string'&&cellKeyRe.test(k)),
+        visible:x.visible!==false,
+        foes:(Array.isArray(x.foes)?x.foes:[]).filter(o=>o&&typeof o.name==='string')
+          .map(o=>({name:String(o.name).slice(0,60),qty:Math.max(1,Math.round(+o.qty)||1)})),
+        items:(Array.isArray(x.items)?x.items:[]).filter(o=>o&&typeof o.name==='string'&&typeof o.kind==='string')
+          .map(o=>({kind:String(o.kind).slice(0,20),name:String(o.name).slice(0,60)})),
+        note:String(x.note||'').slice(0,2000),
+        secret:(Array.isArray(x.secret)?x.secret:[]).filter(k=>typeof k==='string'&&cellKeyRe.test(k)),
+        revealed:(Array.isArray(x.revealed)?x.revealed:[]).filter(k=>typeof k==='string'&&cellKeyRe.test(k)),
+        env:{name:String(e.name||'').slice(0,80), type:String(e.type||'').slice(0,40),
+          difficulty:String(e.difficulty||'').slice(0,10), desc:String(e.desc||'').slice(0,2000),
+          features:(Array.isArray(e.features)?e.features:[]).filter(ft=>ft&&typeof ft.name==='string')
+            .map(ft=>({id:rid(4),name:String(ft.name).slice(0,60),cost:Math.max(0,Math.round(+ft.cost)||0),text:String(ft.text||'').slice(0,500)}))}
+      };
+    });
+    floors.push({id:f.id||rid(4),name:String(f.name||('Piso '+(fi+1))).slice(0,24),grid:g,tiles,edges,strokes,fog:{},aspects,rooms});
   });
   if(!floors.length){alert('No valid floors in this file');return;}
   const ids=floors.map(f=>f.id);
@@ -1500,6 +1524,7 @@ function apply(a){
     case 'resource':{const ch=STATE.characters[a.id]; if(ch)ch[a.field]=a.value; break;}
     case 'fear': STATE.fear=Math.max(0,Math.min(12,a.value)); break;
     case 'npclib': STATE.npcLibrary=a.list; break;
+    case 'envlib': STATE.envLibrary=a.list; break;
     case 'encounter': STATE.encounter=a.list; break;
     case 'initiative': STATE.initiative=a.list; break;
     case 'initnext':{const l=STATE.initiative; if(!l.length)break;
@@ -3330,6 +3355,10 @@ const AI_SYSTEM='You are a Daggerheart (Darrington Press 2025 SRD) GM assistant 
 +'ENCOUNTER BALANCING (RAW Battle Points): start with (3 x number of PCs) + 2 points. Adjust: -1 easier/shorter; -2 if using 2+ Solos; -2 if adding +1d4 (or static +2) to all adversary damage; +1 if you use an adversary from a lower tier; +1 if no Bruisers/Hordes/Leaders/Solos; +2 harder/longer. Spend: 1 point = a GROUP of Minions equal to party size, or one Social/Support; 2 = Horde/Ranged/Skulk/Standard; 3 = Leader; 4 = Bruiser; 5 = Solo. Always SHOW the budget math briefly (base, adjustments, what each pick costs) and spend the full budget.\n'
 +'Match adversary tier to party tier (Lv1=T1, Lv2-4=T2, Lv5-7=T3, Lv8-10=T4). Custom statblock benchmarks by tier - ATK +1/+2/+3/+4; damage 1d6+2..1d12+4, 2d6+3..2d12+4, 3d8+3..3d12+5, 4d8+10..4d12+15; Difficulty 11/14/17/20; thresholds ~7-12, 10-20, 20-32, 25-45. Minions have thresholds 0/0. Types: Standard, Minion, Horde, Bruiser, Leader, Ranged, Skulk, Social, Solo, Support. 1-3 fiction-first features each; mark Fear costs "(1 Fear)".\n'
 +'ENVIRONMENT FEAR FEATURES: when asked for environment/scene Fear features, include a json block {"envFeatures":[{"name":"","cost":1,"text":"what happens when the GM spends that Fear"}]} with costs 1-2 (3 for huge effects), tied to the described setting.\n'
++'ENVIRONMENTS (full stat blocks for a room/area, reusable): when asked for an environment, a location, a hazard area or "un entorno", include a json block '
++'{"environments":[{"name":"","type":"Exploration|Social|Traversal|Event","difficulty":11,"desc":"one or two lines the GM reads or paraphrases","features":[{"name":"","cost":1,"text":"what happens when the GM spends that Fear"}]}]}. '
++'Give 2-4 features, at least one costing 0 (an always-on trait). Scale difficulty to the party tier the same way you scale adversaries. '
++'This is different from envFeatures: envFeatures are loose scene features for the Fear tab, while environments are whole reusable blocks the GM attaches to a map room.\n'
 +'CUSTOM EQUIPMENT: when asked to design gear, include {"equipment":{"weapons":[{"name":"","tier":1,"type":"Primary","trait":"Agility","range":"Melee","damageDice":"d8","damageBonus":0,"damageType":"phy","burden":"One-Handed","feature":"","evasionMod":0}],"armor":[{"name":"","tier":1,"baseMajor":6,"baseSevere":13,"baseScore":3,"feature":"","evasionMod":0}],"items":[{"name":"","category":"","text":"","evasionMod":0,"majorMod":0,"severeMod":0,"scoreMod":0}]}} — match tier benchmarks for damage/thresholds.\n'
 +'For pure rules questions answer RAW from the SRD; label homebrew explicitly.';
 function aiContext(){
@@ -3370,10 +3399,10 @@ async function aiSend(){
 }
 function renderAiReply(reply){
   const parts=reply.split(/```json([\s\S]*?)```/);
-  let html=''; let adv=[],env=[],eqp=[];
+  let html=''; let adv=[],env=[],eqp=[],envs=[];
   parts.forEach((p,i)=>{
     if(i%2===0){ if(p.trim())html+='<div style="white-space:pre-wrap;font-size:13px">'+esc(p.trim())+'</div>'; }
-    else { try{const o=JSON.parse(p); if(o.adversaries)adv=adv.concat(o.adversaries); if(o.envFeatures)env=env.concat(o.envFeatures); if(o.equipment)eqp.push(o.equipment);}catch(e){} }
+    else { try{const o=JSON.parse(p); if(o.adversaries)adv=adv.concat(o.adversaries); if(o.envFeatures)env=env.concat(o.envFeatures); if(o.environments)envs=envs.concat(o.environments); if(o.equipment)eqp.push(o.equipment);}catch(e){} }
   });
   const div=aiMsg('assistant',html||'<span class="muted">(empty reply)</span>');
   if(!div)return;
@@ -3399,6 +3428,24 @@ function renderAiReply(reply){
     const b=document.createElement('button'); b.className='sm primary'; b.style.marginTop='6px'; b.textContent='⬇ Add '+cap2.length+' Fear feature'+(cap2.length>1?'s':'')+' to Fear tab';
     b.onclick=()=>{dispatch({kind:'envfeat',list:[...(STATE.envFeatures||[]),...cap2.map(f=>({id:rid(4),name:f.name||'Feature',cost:Math.max(0,+f.cost||1),text:f.text||''}))]});
       flash('Added to the Fear tab'); b.disabled=true; b.textContent='✓ added';};
+    div.appendChild(b);
+  }
+  /* Entornos completos → biblioteca. Desde ahí se cargan en cualquier pieza del mapa, que es
+     el punto de tenerlos como objeto y no como texto suelto en el chat. */
+  if(envs.length){
+    const cap3=envs.slice();
+    const prev=document.createElement('div'); prev.className='muted'; prev.style.cssText='font-size:11px;margin-top:6px';
+    prev.textContent=cap3.map(e=>e.name+' ('+((e.features||[]).length)+' rasgos)').join(' · ');
+    div.appendChild(prev);
+    const b=document.createElement('button'); b.className='sm primary'; b.style.marginTop='6px';
+    b.textContent='⬇ Guardar '+cap3.length+' entorno'+(cap3.length===1?'':'s')+' en la biblioteca';
+    b.onclick=()=>{ const list=[...envLib()];
+      cap3.forEach(e=>{ const n=envNorm(e);
+        const i=list.findIndex(x=>x.name.toLowerCase()===n.name.toLowerCase());
+        if(i>-1){n.id=list[i].id; list[i]=n;} else list.push(n); });
+      envLibSave(list); renderRoomDetail();
+      flash('Biblioteca de entornos: '+list.length+' — cárgalos desde cualquier pieza');
+      b.disabled=true; b.textContent='✓ guardados'; };
     div.appendChild(b);
   }
   if(eqp.length){
@@ -3615,6 +3662,12 @@ function envUse(id){const f=(STATE.envFeatures||[]).find(x=>x.id===id); if(!f)re
   dispatch({kind:'log',entry:{id:rid(6),who:'GM ',text:'activates '+f.name+' ('+f.cost+' Fear): '+(f.text||'').slice(0,100),sys:true}});}
 function envAsk(){const s=val('envSetting'); if(!s){flash('Describe the setting first.');return;}
   setVal('ai-in','Propose 3 environment Fear features for this setting: '+s+'. Use the envFeatures json format, costs 1-2 Fear each.');
+  showTab('ai'); aiSend();}
+/* Pide un entorno COMPLETO (bloque reutilizable), no rasgos sueltos de escena. La respuesta
+   trae un bloque json "environments" y el botón que aparece bajo la respuesta lo guarda en
+   la biblioteca, listo para cargarlo en cualquier pieza. */
+function envAskFull(){const s=val('envSetting'); if(!s){flash('Describe el lugar primero.');return;}
+  setVal('ai-in','Diseña un entorno completo para: '+s+'. Usa el formato json "environments", en español, con 3 rasgos (uno de coste 0).');
   showTab('ai'); aiSend();}
 function ebKind(){const k=val('eb-kind');
   document.getElementById('eb-weapon').classList.toggle('hidden',k!=='weapon');
@@ -3839,8 +3892,10 @@ function roomFromSelection(){
   const room={id:'rm-'+rid(6), name:nm,
     color:ROOM_COLORS[roomsOf().length%ROOM_COLORS.length],
     /* foes/items son listas estructuradas (encuentro y botín), no texto libre:
-       se pasan a la iniciativa y al inventario del personaje. */
-    cells:[...SEL], visible:true, foes:[], items:[], note:'', secret:[], revealed:[]};
+       se pasan a la iniciativa y al inventario del personaje. env es el bloque
+       de Entorno estilo Daggerheart de esta pieza (ver roomEnvHTML). */
+    cells:[...SEL], visible:true, foes:[], items:[], note:'', secret:[], revealed:[],
+    env:{name:'',type:'',difficulty:'',desc:'',features:[]}};
   selRoom=room.id;                 // antes del dispatch: el render va dentro y ya la deja seleccionada
   dispatch({kind:'roomset',room});
   clearSelection(); renderRooms(); renderMap();
@@ -3872,15 +3927,74 @@ function roomPickerList(){
   if(P.what==='foe')
     return (typeof ADV!=='undefined'?ADV:[]).filter(a=>!q||a.name.toLowerCase().includes(q)).slice(0,40)
       .map(a=>({key:a.name,label:a.name,meta:'T'+(a.tier||'?')+' · '+(a.type||'')+' · HP '+(a.hp||'?')}));
+  if(P.what==='env')
+    return envLib().filter(e=>!q||(e.name+' '+(e.type||'')).toLowerCase().includes(q)).slice(0,40)
+      .map(e=>({key:e.id,label:e.name,
+        meta:[e.type,e.difficulty?('Dif '+e.difficulty):'',e.features.length+' rasgo'+(e.features.length===1?'':'s')]
+          .filter(Boolean).join(' · ')}));
   const out=[];
   [['weapon',EQUIP.weapons||[]],['armor',EQUIP.armor||[]],['item',EQUIP.items||[]]].forEach(([k,arr])=>
     arr.forEach(e=>{ if(!q||e.name.toLowerCase().includes(q))
       out.push({key:k+'|'+e.name,label:e.name,meta:(k==='weapon'?'Arma':k==='armor'?'Armadura':'Objeto')+(e.category?' · '+e.category:'')}); }));
   return out.slice(0,40);
 }
+/* ---- biblioteca de entornos ----
+   Un entorno es un objeto reutilizable, no algo atado a una sala: se guarda una vez y se
+   carga en cualquier pieza, igual que npcLibrary con los adversarios. La IA también puede
+   llenarla en plena sesión (ver el bloque "environments" en AI_SYSTEM). */
+function envLib(){ return STATE.envLibrary||(STATE.envLibrary=[]); }
+function envLibSave(list){ dispatch({kind:'envlib',list}); }
+/* Normaliza cualquier entorno (de la IA, de un archivo o de una pieza) a la forma canónica. */
+function envNorm(e,keepId){
+  const o=e||{};
+  return { id:(keepId&&o.id)||rid(5), name:o.name||'Entorno', type:o.type||'', difficulty:o.difficulty||'',
+    desc:o.desc||o.description||'',
+    features:(Array.isArray(o.features)?o.features:[]).map(f=>({id:f.id||rid(4),
+      name:f.name||'Rasgo', cost:Math.max(0,+f.cost||0), text:f.text||''})) };
+}
+/* Guarda el entorno de una pieza en la biblioteca. Copia profunda: editar la sala después
+   no debe alterar la entrada guardada, ni al revés. */
+function roomEnvToLib(id){
+  const r=roomById(id); if(!r)return;
+  const e=roomEnv(r);
+  if(!e.name&&!e.features.length){flash('Este entorno está vacío — ponle nombre o algún rasgo primero.');return;}
+  const entry=envNorm(JSON.parse(JSON.stringify(e)));
+  const list=[...envLib()];
+  const i=list.findIndex(x=>x.name.toLowerCase()===entry.name.toLowerCase());
+  if(i>-1){ entry.id=list[i].id; list[i]=entry; flash('«'+entry.name+'» actualizado en la biblioteca'); }
+  else { list.push(entry); flash('«'+entry.name+'» guardado en la biblioteca de entornos'); }
+  envLibSave(list);
+}
+/* Carga una entrada de la biblioteca en una pieza. Los ids de los rasgos se regeneran para
+   que dos salas con el mismo entorno no compartan identificadores. */
+function roomEnvFromLib(id,envId){
+  const r=roomById(id), src=envLib().find(x=>x.id===envId); if(!r||!src)return;
+  const copy=JSON.parse(JSON.stringify(r));
+  copy.env=envNorm(JSON.parse(JSON.stringify(src)));
+  copy.env.id=undefined; delete copy.env.id;
+  copy.env.features=copy.env.features.map(f=>({...f,id:rid(4)}));
+  dispatch({kind:'roomset',room:copy});
+  roomPickerClose();
+  flash('Entorno «'+src.name+'» cargado en «'+(r.name||'la pieza')+'»');
+}
+function roomEnvClear(id){
+  const r=roomById(id); if(!r)return;
+  if(!okDouble('envclr'+id,'Vaciar el entorno de esta pieza.'))return;
+  /* Vacío de verdad: envNorm() pone 'Entorno' por defecto, que es lo correcto para una
+     entrada de biblioteca pero deja la pieza pareciendo que aún tiene entorno. */
+  const copy=JSON.parse(JSON.stringify(r));
+  copy.env={name:'',type:'',difficulty:'',desc:'',features:[]};
+  dispatch({kind:'roomset',room:copy});
+}
+function envLibDel(envId){
+  const e=envLib().find(x=>x.id===envId); if(!e)return;
+  if(!okDouble('envlib'+envId,'Borrar «'+e.name+'» de la biblioteca de entornos.'))return;
+  envLibSave(envLib().filter(x=>x.id!==envId));
+}
 function roomPickerAdd(key){
   const P=window.__roomPicker; if(!P)return;
   const r=roomById(P.id); if(!r)return;
+  if(P.what==='env'){ roomEnvFromLib(P.id,key); return; }   // reemplaza el entorno entero, no acumula
   const copy=JSON.parse(JSON.stringify(r));
   if(P.what==='foe'){ copy.foes=roomEnemies(copy);
     const ex=copy.foes.find(f=>f.name===key);
@@ -3989,7 +4103,7 @@ function renderRooms(){
       <span style="min-width:0;flex:1">
         <div class="nm">${esc(r.name||'Sala')}</div>
         <div class="mt">${(()=>{const f=roomEnemies(r).reduce((s,x)=>s+(x.qty||1),0);
-          return f?'<i title="enemigos">☠ '+f+'</i>':'';})()}${roomLoot(r).length?'<i title="loot">◈ '+roomLoot(r).length+'</i>':''}${sec?'<i title="puertas secretas">⚿ '+sec+'</i>':''}<i>${n} celdas</i></div>
+          return f?'<i title="enemigos">☠ '+f+'</i>':'';})()}${roomLoot(r).length?'<i title="loot">◈ '+roomLoot(r).length+'</i>':''}${roomEnv(r).features.length?'<i title="entorno">🕯 '+roomEnv(r).features.length+'</i>':''}${sec?'<i title="puertas secretas">⚿ '+sec+'</i>':''}<i>${n} celdas</i></div>
       </span>
       ${gm?`<span class="eye" title="visible para los jugadores" onclick="roomToggleVis('${r.id}',event)">${r.visible===false?'🚫':'👁'}</span>`:''}
     </div>`;}).join(''):'<div class="muted" style="font-size:11px;padding:10px">— sin piezas en este piso —</div>';
@@ -4025,6 +4139,64 @@ function roomLootHTML(r){
     </div>
     ${P&&P.id===r.id&&P.what==='loot'?roomPickerHTML():''}</div>`;
 }
+/* ---- entorno de una pieza (v8) ----
+   Bloque de Entorno estilo Daggerheart (tipo/dificultad/rasgos con coste en Miedo),
+   pero ligado a la pieza en vez de vivir suelto en la pestaña de Miedo: así el GM
+   lo tiene a mano justo cuando esa sala está activa. Los rasgos se activan igual
+   que los "Environment Fear Features" globales (gastan Miedo, quedan en el log). */
+function roomEnv(r){ const e=(r&&r.env)||{}; return {name:e.name||'',type:e.type||'',difficulty:e.difficulty||'',desc:e.desc||'',features:Array.isArray(e.features)?e.features:[]}; }
+function roomEnvEdit(id,field,val){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.env=roomEnv(copy); copy.env[field]=val;
+  dispatch({kind:'roomset',room:copy}); }
+/* Añade el rasgo vacío y se edita en el sitio. NO usar askText/prompt aquí: este navegador
+   tiene los diálogos bloqueados y devolvían null, así que "+ rasgo" no hacía absolutamente
+   nada — el mismo fallo mudo que ya costó dos rondas con las piezas y con las campañas. */
+function roomEnvFeatAdd(id){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.env=roomEnv(copy);
+  copy.env.features=[...copy.env.features,{id:rid(4),name:'Rasgo '+(copy.env.features.length+1),cost:1,text:''}];
+  dispatch({kind:'roomset',room:copy}); }
+/* Edición campo a campo del rasgo, desde los propios inputs de la tarjeta. */
+function roomEnvFeatEdit(id,fid,field,val){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.env=roomEnv(copy);
+  const f=copy.env.features.find(x=>x.id===fid); if(!f)return;
+  f[field]=(field==='cost')?Math.max(0,+val||0):val;
+  dispatch({kind:'roomset',room:copy}); }
+function roomEnvFeatDel(id,fid){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.env=roomEnv(copy);
+  copy.env.features=copy.env.features.filter(f=>f.id!==fid);
+  dispatch({kind:'roomset',room:copy}); }
+function roomEnvFeatUse(id,fid){ const r=roomById(id); if(!r)return;
+  const f=roomEnv(r).features.find(x=>x.id===fid); if(!f)return;
+  if(STATE.fear<f.cost){flash('No hay Miedo suficiente.');return;}
+  dispatch({kind:'fear',value:STATE.fear-f.cost});
+  dispatch({kind:'log',entry:{id:rid(6),who:'GM ',text:'activa '+f.name+' ('+(r.name||'pieza')+', '+f.cost+' Miedo): '+(f.text||'').slice(0,100),sys:true}}); }
+function roomEnvHTML(r){
+  const e=roomEnv(r);
+  return `<div class="fld"><label>Entorno ${e.name?('— '+esc(e.name)):''}</label>
+    <div class="row" style="gap:4px">
+      <input placeholder="nombre" value="${esc(e.name)}" onchange="roomEnvEdit('${r.id}','name',this.value)" style="flex:2">
+      <input placeholder="tipo (Exploración, Evento…)" value="${esc(e.type)}" onchange="roomEnvEdit('${r.id}','type',this.value)" style="flex:2">
+      <input placeholder="Dificultad" value="${esc(e.difficulty)}" onchange="roomEnvEdit('${r.id}','difficulty',this.value)" style="width:70px">
+    </div>
+    <textarea rows="2" placeholder="descripción / rasgo pasivo" onchange="roomEnvEdit('${r.id}','desc',this.value)">${esc(e.desc)}</textarea>
+    ${e.features.map(f=>`<div class="cd" style="margin-top:4px"><div class="row" style="gap:4px">
+      <input value="${esc(f.name)}" placeholder="nombre del rasgo" onchange="roomEnvFeatEdit('${r.id}','${f.id}','name',this.value)"
+        style="flex:1;min-width:0;font-weight:700;color:var(--gold)">
+      <input type="number" min="0" value="${f.cost}" title="coste en Miedo" onchange="roomEnvFeatEdit('${r.id}','${f.id}','cost',this.value)" style="width:52px">
+      <span class="badge spell" title="coste en Miedo">Miedo</span>
+      <button class="xs primary" onclick="roomEnvFeatUse('${r.id}','${f.id}')" ${STATE.fear<f.cost?'disabled title="no hay Miedo suficiente"':''}>usar</button>
+      <button class="xs danger" onclick="roomEnvFeatDel('${r.id}','${f.id}')">✕</button></div>
+      <textarea rows="2" placeholder="efecto — qué pasa al gastar ese Miedo" style="margin-top:3px"
+        onchange="roomEnvFeatEdit('${r.id}','${f.id}','text',this.value)">${esc(f.text)}</textarea></div>`).join('')}
+    <div class="row" style="gap:4px;margin-top:4px;flex-wrap:wrap">
+      <button class="xs" onclick="roomEnvFeatAdd('${r.id}')">+ rasgo</button>
+      <button class="xs" onclick="roomPickerOpen('${r.id}','env')" title="cargar un entorno guardado">📚 biblioteca (${envLib().length})</button>
+      <button class="xs" onclick="roomEnvToLib('${r.id}')" title="guardar este entorno para reutilizarlo">💾 guardar</button>
+      ${e.name||e.features.length?`<button class="xs danger" onclick="roomEnvClear('${r.id}')" title="vaciar el entorno de esta pieza">limpiar</button>`:''}
+    </div>
+    ${(window.__roomPicker&&window.__roomPicker.id===r.id&&window.__roomPicker.what==='env')?roomPickerHTML():''}
+  </div>`;
+}
 function roomPickerHTML(){
   return `<div class="rmpicker">
     <input id="rpq" placeholder="buscar…" oninput="roomPickerQuery(this.value)" style="width:100%;font-size:11px">
@@ -4034,9 +4206,13 @@ function roomPickerHTML(){
 function renderRoomPickerList(){
   const box=document.getElementById('rplist'); if(!box)return;
   const list=roomPickerList();
+  const isEnv=(window.__roomPicker||{}).what==='env';
   box.innerHTML=list.length?list.map(o=>`<div class="rpitem" onclick="roomPickerAdd('${o.key.replace(/'/g,"\\'")}')">
-    <span class="n">${esc(o.label)}</span><span class="mt">${esc(o.meta)}</span></div>`).join('')
-    :'<div class="muted" style="font-size:11px;padding:6px">sin resultados</div>';
+    <span class="n">${esc(o.label)}</span><span class="mt">${esc(o.meta)}</span>${
+    /* Sólo la biblioteca de entornos se puede podar desde aquí; ADV y EQUIP son catálogo fijo. */
+    isEnv?`<button class="xs danger" title="borrar de la biblioteca"
+      onclick="event.stopPropagation();envLibDel('${o.key}')">✕</button>`:''}</div>`).join('')
+    :`<div class="muted" style="font-size:11px;padding:6px">${isEnv?'La biblioteca de entornos está vacía. Crea uno en una pieza y pulsa «guardar», o pídeselo al asistente.':'sin resultados'}</div>`;
 }
 function renderRoomDetail(){
   const box=document.getElementById('roomdetail'); if(!box)return;
@@ -4048,6 +4224,7 @@ function renderRoomDetail(){
       <input value="${esc(r.name||'')}" onchange="roomEdit('${r.id}','name',this.value)"></div>
     ${roomFoesHTML(r)}
     ${roomLootHTML(r)}
+    ${roomEnvHTML(r)}
     <div class="fld"><label>Nota del GM</label>
       <textarea rows="2" onchange="roomEdit('${r.id}','note',this.value)">${esc(r.note||'')}</textarea></div>
     <div class="fld"><label>Puertas secretas — ${sec?(rev+' de '+sec+' reveladas'):'ninguna'}</label>
