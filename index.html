@@ -117,6 +117,10 @@
   @media(min-width:1650px){.panegrid{grid-template-columns:1fr 1fr 1fr}
     .panegrid>.pg-wide{grid-column:span 2}}
 
+  .warnbox{border:1px solid var(--gold);border-left:4px solid var(--gold);background:#2a2118;
+    border-radius:0 8px 8px 0;padding:10px 12px;margin:10px 0}
+  .warnbox b{color:var(--gold)}
+  .warnbox p{margin:5px 0 0;font-size:12px;line-height:1.45}
   .dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
   .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
   .dot.host{background:var(--gold);box-shadow:0 0 6px var(--gold)}
@@ -618,6 +622,16 @@
 
 <div class="modal" id="connectModal"><div class="box">
   <h3 style="color:var(--gold)">Campañas <span class="muted" id="buildTag" style="font-size:11px"></span></h3>
+  <!-- Sin relay configurado no hay multijugador, y el aviso discreto de "offline"
+       no bastaba: la gente entraba, veía su ficha y creía que el VTT estaba roto. -->
+  <div id="relayWarn" style="display:none">
+    <div class="warnbox">
+      <b>⚠ Falta configurar la conexión</b>
+      <p>Este navegador todavía no sabe a qué servidor conectarse, así que <b>no vas a poder jugar con nadie</b>: entrarías en modo local, viendo solo tus propias fichas.</p>
+      <p class="muted">Se hace una sola vez por dispositivo. Pídele la dirección a tu GM si no la tienes.</p>
+      <button class="primary sm" style="width:100%;margin-top:6px" onclick="cfgRelayHost()">Configurar ahora</button>
+    </div>
+  </div>
   <div class="col" style="margin:10px 0"><label>Tu nombre</label><input id="m-name" placeholder="p.ej. Sebas"></div>
   <div id="campList"></div>
   <hr>
@@ -803,11 +817,20 @@ function relayHttp(){
 }
 function cfgRelayHost(){
   const cur=localStorage.getItem('ph-relay-host')||'';
-  const v=prompt('Servidor relay propio (el que desplegaste en Render).\nEjemplo: pulpheart-relay.onrender.com  (sin https://)\nTODOS en la mesa deben usar el mismo.',cur);
+  const v=prompt('Servidor de conexión (te lo da tu GM).\nEjemplo: pulp-heart.onrender.com  (sin https://)\nTODOS en la mesa deben usar el mismo.',cur);
   if(v===null)return;
   if(v.trim())localStorage.setItem('ph-relay-host',v.trim());
   else localStorage.removeItem('ph-relay-host');
-  flash('Guardado — recarga la página para aplicarlo.');
+  relayWarnUpdate();
+  if(v.trim()&&confirm('Guardado.\n\nHay que recargar la página para aplicarlo. ¿Recargar ahora?'))location.reload();
+  else flash('Guardado — recarga la página para aplicarlo.');
+}
+/* Muestra u oculta el aviso de "falta configurar". Se llama al abrir el modal y
+   después de configurar, para que desaparezca en el acto y no haya que adivinar
+   si quedó guardado. */
+function relayWarnUpdate(){
+  const w=document.getElementById('relayWarn'); if(!w)return;
+  w.style.display=relayBase()?'none':'';
 }
 /* WebSocket con reintentos, compartido por GM y jugador. Los reintentos importan
    más de lo que parece: en el plan gratis de Render el servicio se duerme tras
@@ -2992,7 +3015,7 @@ function updatePeerCount(){const n=document.getElementById('peerCount'); if(!n)r
   n.textContent=ME.isHost?`· ${players} player(s)`:'';}
 function setDot(cls,label){const d=document.getElementById('netdot'); d.className='dot '+(cls||''); document.getElementById('netlabel').textContent=label;}
 function setStatus(s){const e=document.getElementById('m-status'); if(e)e.textContent=s;}
-function openConnect(){document.getElementById('connectModal').classList.add('show');}
+function openConnect(){relayWarnUpdate();document.getElementById('connectModal').classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function closeGen(){document.getElementById('genModal').classList.remove('show');}
 function copyRoom(){const c=document.getElementById('roomCode').textContent; navigator.clipboard&&navigator.clipboard.writeText(c);}
