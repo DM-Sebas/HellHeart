@@ -68,7 +68,15 @@ wss.on('connection', (ws, req) => {
        lo conoce puede reclamarla — si no, cualquiera que adivine el código de 6
        letras podría echar al GM y suplantarlo. Reconectar con el mismo secreto sí
        está permitido: es el caso normal cuando al GM se le cae el wifi. */
-    if (room.hostSecret && secret !== room.hostSecret) { ws.close(4003, 'room already hosted'); return; }
+    if (room.hostSecret && secret !== room.hostSecret) {
+      /* Avisar antes de cerrar. Medido contra el despliegue real: el cierre del
+         socket puede tardar ~10s en llegarle al cliente a través del proxy, y sin
+         este mensaje el impostor vería "hosting" todo ese rato aunque su conexión
+         esté inerte. El mensaje sí llega al instante. */
+      send(ws, { t: 'sys', kind: 'denied', reason: 'esta sala ya tiene GM' });
+      setTimeout(() => { try { ws.close(4003, 'room already hosted'); } catch (e) {} }, 250);
+      return;
+    }
     if (!room.hostSecret) room.hostSecret = secret || null;
     if (room.host && room.host !== ws) {
       send(room.host, { t: 'sys', kind: 'replaced' });
@@ -90,6 +98,10 @@ wss.on('connection', (ws, req) => {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }   // basura: ignorar
     if (!msg || typeof msg.t !== 'string') return;
+    /* Salida explícita. Sin esto la baja tarda ~10s: el cierre del socket viaja
+       lento a través del proxy y el servidor no se entera hasta el latido. Con el
+       aviso, el resto de la mesa lo ve al instante. */
+    if (msg.t === 'bye') { try { ws.close(1000, 'bye'); } catch (e) {} return; }
     if (ws.__role === 'host') {
       // el GM difunde a todos los jugadores; se reenvía tal cual, sin interpretarlo
       room.players.forEach(p => { if (p !== ws) send(p, msg); });
@@ -119,14 +131,16 @@ wss.on('connection', (ws, req) => {
 });
 
 /* Un socket móvil que se muere sin cerrar (túnel, pantalla apagada, cambio de red)
-   quedaría colgado para siempre. Este latido los limpia. */
+   quedaría colgado para siempre. Este latido los limpia. 15s y no 30s porque, medido
+   contra el despliegue real, el proxy tarda en propagar los cierres y este latido
+   acaba siendo lo que de verdad detecta las bajas. */
 const beat = setInterval(() => {
   wss.clients.forEach(ws => {
     if (ws.isAlive === false) { try { ws.terminate(); } catch (e) {} return; }
     ws.isAlive = false;
     try { ws.ping(); } catch (e) {}
   });
-}, 30000);
+}, 15000);
 wss.on('close', () => clearInterval(beat));
 
 server.listen(PORT, () => console.log('pulpheart-relay escuchando en :' + PORT));
