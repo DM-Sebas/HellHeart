@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PulpHeart VTT — paranormal bureau table</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<!-- PeerJS eliminado en v6: el transporte ahora es un WebSocket al relay propio.
+     Ver relay/DEPLOY.md — WebRTC no atravesaba el CGNAT de las redes móviles. -->
 <style>
   :root{
     --bg:#15110f; --panel:#1e1815; --panel2:#262019; --line:#3a2f26;
@@ -626,7 +627,7 @@
   <button class="sm" style="width:100%;margin-top:8px" onclick="openCampaignFile()">📂 Abrir campaña desde archivo…</button>
   <p class="muted" style="font-size:11px;margin-top:8px">La campaña se guarda sola, en cada cambio. Los jugadores guardan copia local al sincronizar: si el GM no está conectado, entran igual y ven sus personajes (modo offline).</p>
   <div id="m-status" class="muted" style="margin-top:6px;font-size:12px"></div>
-  <div class="muted" style="font-size:10px;margin-top:6px;cursor:pointer;text-decoration:underline" onclick="cfgPeerHost()">config. de red (broker propio)</div>
+  <div class="muted" style="font-size:10px;margin-top:6px;cursor:pointer;text-decoration:underline" onclick="cfgRelayHost()">config. de red (relay propio)</div>
 </div></div>
 
 <div class="modal" id="tokenModal"><div class="box">
@@ -716,33 +717,20 @@ function terrainStyle(id){
 
 let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strokes:[], characters:{}, fear:0, floors:null, floorIdx:0, fog:{}, aspects:[],
   npcLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], initRound:1, log:[], lastRoll:null };
-let ME={ id:null, name:'', isHost:false, role:'player', peer:null, conns:[], hostConn:null };
+/* `socket` es el WebSocket vivo; `sock` el envoltorio con reintentos que lo creó.
+   `peer` es un alias de socket que se conserva porque medio código pregunta
+   `(ME.isHost||!ME.peer)` para decir "soy GM o estoy offline" — mantenerlo evita
+   reescribir esa comprobación en veinte sitios. */
+let ME={ id:null, name:'', isHost:false, role:'player', peer:null, socket:null, sock:null };
 let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=null, stepQueue=[], stepCtx=null, npcEditId=null, activeTab=null;
 let selShape='rect', SEL=new Set(), selDrag=null;   // area-selection state (see AREA SELECTION below)
 
 function rid(n){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 
 /* ============ ICE/TURN (relay for phones on cellular / strict NAT) ============ */
-let HH_ICE={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}]};
-(async function initIce(){
-  try{
-    const custom=localStorage.getItem('hh-turn-url'); // optional: your own Metered.ca credentials URL
-    if(custom){ const r=await fetch(custom); const s=await r.json(); if(Array.isArray(s)&&s.length){ HH_ICE={iceServers:s}; console.log('ICE: custom TURN loaded'); return; } }
-    const secret='openrelayprojectsecret'; // Open Relay public staticauth secret (openrelayproject.org)
-    const username=''+(Math.floor(Date.now()/1000)+12*3600); // 12h ephemeral credential
-    const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-1'},false,['sign']);
-    const sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(username));
-    const cred=btoa(String.fromCharCode(...new Uint8Array(sig)));
-    const t=u=>({urls:u,username:username,credential:cred});
-    HH_ICE.iceServers.push(
-      t('turn:staticauth.openrelay.metered.ca:80'),
-      t('turn:staticauth.openrelay.metered.ca:80?transport=tcp'),
-      t('turn:staticauth.openrelay.metered.ca:443'),
-      t('turns:staticauth.openrelay.metered.ca:443?transport=tcp')
-    );
-    console.log('ICE: TURN relay ready');
-  }catch(e){ console.warn('ICE: TURN setup failed, STUN only',e); }
-})();
+/* El bloque STUN/TURN de WebRTC vivia aqui. Eliminado en v6: sin WebRTC no hay
+   NAT que atravesar, y era justamente el TURN publico gratuito lo que fallaba
+   desde el celular. Ver relay/DEPLOY.md. */
 
 /* ================= NETWORK ================= */
 /* --- linked campaign save files (File System Access API; Chrome/Edge) --- */
@@ -803,27 +791,57 @@ async function openCampaignFile(){
   }catch(e){}
 }
 const PH_BUILD='b27';
-function peerOpts(){
-  const o={debug:1,config:HH_ICE};
-  try{
-    const h=(localStorage.getItem('hh-peer-host')||'').trim();
-    if(h){
-      const rest=h.replace(/^https?:\/\//,'').split('/');
-      const hp=rest.shift().split(':');
-      o.host=hp[0]; o.port=+(hp[1]||443); o.secure=true;
-      o.path='/'+(rest.join('/')||'');
-    }
-  }catch(e){}
-  return o;
+/* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
+   Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
+function relayBase(){
+  const h=(localStorage.getItem('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  return h?('wss://'+h):'';
 }
-function cfgPeerHost(){
-  const cur=localStorage.getItem('hh-peer-host')||'';
-  const v=prompt('Broker de señalización propio (vacío = público 0.peerjs.com).\nFormato: midominio.com  o  midominio.com:443/ruta\nTODOS en la mesa deben usar el mismo.',cur);
+function relayHttp(){
+  const h=(localStorage.getItem('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  return h?('https://'+h):'';
+}
+function cfgRelayHost(){
+  const cur=localStorage.getItem('ph-relay-host')||'';
+  const v=prompt('Servidor relay propio (el que desplegaste en Render).\nEjemplo: pulpheart-relay.onrender.com  (sin https://)\nTODOS en la mesa deben usar el mismo.',cur);
   if(v===null)return;
-  if(v.trim())localStorage.setItem('hh-peer-host',v.trim());
-  else localStorage.removeItem('hh-peer-host');
+  if(v.trim())localStorage.setItem('ph-relay-host',v.trim());
+  else localStorage.removeItem('ph-relay-host');
   flash('Guardado — recarga la página para aplicarlo.');
 }
+/* WebSocket con reintentos, compartido por GM y jugador. Los reintentos importan
+   más de lo que parece: en el plan gratis de Render el servicio se duerme tras
+   ~15 min y el primer intento de la noche tarda ~1 min en despertarlo. */
+function openRelaySocket(url,{onopen,onmessage,onclose,onfail,maxTries=3}={}){
+  let tries=0,stopped=false,sock=null;
+  function attempt(){
+    tries++;
+    try{sock=new WebSocket(url);}catch(e){
+      if(tries<maxTries&&!stopped)setTimeout(attempt,1500*tries); else onfail&&onfail(e); return;}
+    let opened=false;
+    const failTimer=setTimeout(()=>{ if(!opened){ try{sock.close();}catch(e){}
+      if(tries<maxTries&&!stopped)setTimeout(attempt,1500*tries); else onfail&&onfail(new Error('timeout')); } },12000);
+    sock.onopen=()=>{opened=true;clearTimeout(failTimer);onopen&&onopen(sock);};
+    sock.onmessage=(ev)=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;} onmessage&&onmessage(d);};
+    sock.onclose=(ev)=>{clearTimeout(failTimer);
+      if(!opened&&tries<maxTries&&!stopped){setTimeout(attempt,1500*tries);return;}
+      onclose&&onclose(ev);};
+    sock.onerror=()=>{};
+  }
+  attempt();
+  return {stop(){stopped=true;try{sock&&sock.close();}catch(e){}}, get socket(){return sock;}};
+}
+/* Avisar al relay antes de irse. Medido contra el despliegue real: si sólo cierras
+   el socket, al resto de la mesa le toma ~10s enterarse — el proxy delante de Render
+   no propaga el cierre al instante. Con este aviso la baja es inmediata.
+   `pagehide` y no `beforeunload` porque es el único que dispara de forma fiable en
+   móviles cuando cambias de app o bloqueas la pantalla. */
+(function(){
+  const bye=()=>{ try{ if(ME.socket&&ME.socket.readyState===WebSocket.OPEN)
+    ME.socket.send(JSON.stringify({t:'bye'})); }catch(e){} };
+  window.addEventListener('pagehide',bye);
+  window.addEventListener('beforeunload',bye);
+})();
 const LSC='ph-campaigns';
 let CAMP=null;
 function campIndex(){try{return JSON.parse(localStorage.getItem(LSC))||[]}catch(e){return[]}}
@@ -902,69 +920,101 @@ async function enterCampaign(cmp,seat,fresh){
 }
 function gmSelfTest(){
   if(!CAMP){alert('Entra a una campaña primero.');return;}
-  if(!ME.peer||!ME.isHost){alert('El auto-test es para el GM hosteando. Estado actual: '+(ME.peer?'jugador':'SIN CONEXIÓN — estás en modo local, los jugadores no pueden entrar. Recarga y vuelve a entrar como GM.'));return;}
+  const base=relayBase();
+  if(!base){alert('Todavía no hay relay configurado. Usa "config. de red" abajo del modal de campañas.');return;}
+  if(!ME.socket||!ME.isHost){alert('El auto-test es para el GM hosteando. Estado actual: '+(ME.socket?'jugador':'SIN CONEXIÓN — estás en modo local, los jugadores no pueden entrar. Recarga y vuelve a entrar como GM.'));return;}
   flash('Probando la sala desde afuera…');
-  const t=new Peer(peerOpts());
-  let ok=false;
-  const done=(msg)=>{try{t.destroy();}catch(e){} alert(msg);};
-  const timer=setTimeout(()=>{if(!ok)done('✗ Tu sala NO respondió en 12s.\nTu registro en el broker probablemente cayó: recarga la página y vuelve a entrar a la campaña como GM. Si se repite, es problema de red/broker.');},12000);
-  t.on('open',()=>{
-    const c=t.connect('hh-'+CAMP.code,{metadata:{name:'__selftest'},reliable:true});
-    c.on('open',()=>{ok=true;clearTimeout(timer);c.close();
-      done('✓ Tu sala '+CAMP.code+' es alcanzable desde internet.\nSi el jugador no entra, el problema está en SU lado: build distinto, código mal escrito, o su red bloquea WebRTC (que pruebe otra red o incógnito).');});
+  /* Dos comprobaciones separadas a propósito: primero que el servidor esté vivo,
+     después que la sala responda. Si sólo probáramos la sala, un relay dormido y
+     una sala rota darían el mismo error y no sabrías cuál arreglar. */
+  fetch(relayHttp()+'/ping',{cache:'no-store'}).then(r=>r.json()).then(()=>{
+    const t=new WebSocket(base+'/room/'+encodeURIComponent(CAMP.code)+'?role=player&id=selftest-'+rid(4)+'&name=__selftest');
+    let ok=false;
+    const done=(msg)=>{try{t.close();}catch(e){} alert(msg);};
+    const timer=setTimeout(()=>{if(!ok)done('✗ El relay respondió pero la sala no contestó en 10s.\nRecarga y vuelve a entrar a la campaña como GM.');},10000);
+    t.onmessage=(ev)=>{ let d; try{d=JSON.parse(ev.data);}catch(e){return;}
+      if(d.t==='sys'&&d.kind==='no-host'){ok=true;clearTimeout(timer);
+        done('✗ El relay funciona, pero tu sala '+CAMP.code+' no tiene GM registrado.\nRecarga la página y vuelve a entrar como GM.');return;}
+      ok=true; clearTimeout(timer);
+      done('✓ Tu sala '+CAMP.code+' es alcanzable desde internet.\nSi un jugador no entra, el problema está en SU lado: código mal escrito, página cacheada vieja, o un relay distinto configurado.');};
+    t.onopen=()=>{ setTimeout(()=>{ if(!ok){ok=true;clearTimeout(timer);
+      done('✓ La sala '+CAMP.code+' acepta conexiones.\nSi un jugador no entra, revisa que use el MISMO relay y el mismo código.');} },2500); };
+    t.onerror=()=>{clearTimeout(timer); if(!ok)done('✗ Falló la conexión a la sala. Revisa la URL del relay en "config. de red".');};
+  }).catch(()=>{
+    alert('✗ No pude ni siquiera alcanzar el relay ('+relayHttp()+'/ping).\nPuede estar caído, la URL mal escrita, o esta red lo bloquea. Prueba otra red antes de asumir que el problema es de tu mesa.');
   });
-  t.on('error',e=>{ if(e.type==='peer-unavailable'){clearTimeout(timer);done('✗ El broker NO encuentra tu sala '+CAMP.code+' aunque crees estar hosteando.\nRecarga la página y vuelve a entrar como GM.');}});
 }
 function gmLocalFallback(){
   if(gmLocalFallback.__done)return; gmLocalFallback.__done=true;
-  try{ME.peer&&ME.peer.destroy();}catch(e){}
-  ME.peer=null; ME.isHost=true; ME.role='gm';
+  try{ME.sock&&ME.sock.stop();}catch(e){}
+  ME.sock=null; ME.socket=null; ME.peer=null; ME.isHost=true; ME.role='gm';
   document.getElementById('roleTag').textContent='GM (sin conexión)';
   setDot('','offline — guardando local');
   closeModal('connectModal'); layout('gm'); refreshAll(); campSave.__t=0; campSave();
 }
 function hostCampaign(code){
-  setStatus('Levantando la campaña…'); gmLocalFallback.__done=false;
-  ME.peer=new Peer('hh-'+code,peerOpts());
-  ME.peer.on('open',id=>{
-    ME.id=id; ME.isHost=true; ME.role='gm';
-    document.getElementById('roomCode').textContent=code;
-    document.getElementById('roomPill').style.display='';
-    document.getElementById('roleTag').textContent='GM · '+(STATE.campName||'');
-    setDot('host','hosting'); setStatus(''); closeModal('connectModal');
-    STATE.presence=[{id:'gm',name:ME.name,role:'GM'}];
-    layout('gm'); refreshAll(); campSave.__t=0; campSave();
-  });
-  ME.peer.on('connection',conn=>{
-    conn.on('open',()=>{ ME.conns.push(conn); conn.send({t:'state',state:STATE}); updatePeerCount();
-      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer);
-      STATE.presence.push({id:conn.peer,name:(conn.metadata&&conn.metadata.name)||'Player',role:'Player'});
-      log(null,conn.metadata?.name||'A player',' joined the table.',true); });
-    conn.on('data',d=>hostReceive(conn,d));
-    conn.on('close',()=>{ ME.conns=ME.conns.filter(c=>c!==conn);
-      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer); updatePeerCount();
-      log(null,(conn.metadata&&conn.metadata.name)||'A player',' left the table.',true); });
-  });
-  ME.peer.on('disconnected',()=>{ setDot('','reconectando al broker…');
-    try{ME.peer.reconnect();}catch(e){}
-    setTimeout(()=>{ if(ME.peer&&!ME.peer.disconnected)setDot('host','hosting'); },3000);
-  });
-  ME.peer.on('error',e=>{
-    if(e.type==='unavailable-id')
-      setStatus('Esta campaña ya está abierta como GM en otra pestaña o equipo. Ciérrala allí (o espera ~1 min) y reintenta.');
-    else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){
-      setStatus('Sin conexión al broker — entrando en modo local.');
-      gmLocalFallback();
-    } else setStatus('Error: '+e.type+'. Reintenta.');
+  const base=relayBase();
+  if(!base){ setStatus('No hay relay configurado — usa "config. de red" abajo, o sigue en modo local.'); gmLocalFallback(); return; }
+  /* Secreto por campaña: el código son 6 caracteres y es adivinable. Sin esto
+     cualquiera podría conectarse como GM y suplantarte. Se genera una vez y viaja
+     en el estado guardado, así que reconectar tras una caída sigue funcionando. */
+  if(!STATE.campHostSecret)STATE.campHostSecret=rid(24);
+  setStatus('Levantando la campaña… (si el relay estaba dormido puede tardar ~1 min)');
+  gmLocalFallback.__done=false;
+  ME.id='gm-'+rid(6);
+  const url=base+'/room/'+encodeURIComponent(code)+'?role=host&id='+encodeURIComponent(ME.id)
+    +'&name='+encodeURIComponent(ME.name)+'&secret='+encodeURIComponent(STATE.campHostSecret);
+  ME.sock=openRelaySocket(url,{
+    onopen(sock){
+      ME.socket=sock; ME.peer=sock; ME.isHost=true; ME.role='gm';
+      document.getElementById('roomCode').textContent=code;
+      document.getElementById('roomPill').style.display='';
+      document.getElementById('roleTag').textContent='GM · '+(STATE.campName||'');
+      setDot('host','hosting'); setStatus(''); closeModal('connectModal');
+      STATE.presence=[{id:'gm',name:ME.name,role:'GM'}];
+      layout('gm'); refreshAll(); campSave.__t=0; campSave();
+    },
+    onmessage(d){
+      if(d.t==='sys'){
+        if(d.kind==='join'){
+          STATE.presence=(STATE.presence||[]).filter(p=>p.id!==d.id);
+          STATE.presence.push({id:d.id,name:d.name||'Player',role:'Player'});
+          updatePeerCount(); log(null,d.name||'A player',' joined the table.',true);
+          broadcast();                       // el que entra necesita el estado ya
+        } else if(d.kind==='leave'){
+          STATE.presence=(STATE.presence||[]).filter(p=>p.id!==d.id);
+          updatePeerCount(); log(null,'A player',' left the table.',true);
+        } else if(d.kind==='roster'){
+          STATE.presence=[{id:'gm',name:ME.name,role:'GM'}].concat(
+            (d.players||[]).map(p=>({id:p.id,name:p.name||'Player',role:'Player'})));
+          updatePeerCount();
+        } else if(d.kind==='replaced'){
+          setDot('','desconectado — abriste esta campaña como GM en otro lado');
+          flash('Otro dispositivo tomó el rol de GM de esta campaña.');
+        } else if(d.kind==='denied'){
+          /* El relay rechazó el rol de GM: alguien más ya tiene la sala con otro
+             secreto. Sin esto el usuario vería "hosting" con una conexión inerte. */
+          setDot('','rechazado — esa sala ya tiene GM');
+          setStatus('Esa sala ya tiene un GM con otro dispositivo/navegador. Si el GM eres tú, usa el mismo equipo donde la creaste; si no, pídele el código correcto.');
+          try{ME.sock&&ME.sock.stop();}catch(e){}
+          ME.socket=null; ME.peer=null;
+          gmLocalFallback();
+        }
+        return;
+      }
+      hostReceive(null,d);
+    },
+    onclose(){ setDot('','reconectando…'); },
+    onfail(){ setStatus('No pude alcanzar el relay — entrando en modo local.'); gmLocalFallback(); }
   });
 }
 function joinCampaign(cmp,localState){
-  setStatus('Buscando al GM…');
+  const base=relayBase();
   let settled=false;
-  const offline=(reason)=>{
+  const offline=(msg)=>{
     if(settled)return; settled=true;
-    try{ME.peer&&ME.peer.destroy();}catch(e){}
-    ME.peer=null;
+    try{ME.sock&&ME.sock.stop();}catch(e){}
+    ME.sock=null; ME.socket=null; ME.peer=null;
     if(localState){
       STATE=localState; normalizeFloors();
       ME.isHost=false; ME.role='player'; ME.id='off-'+rid(4);
@@ -972,92 +1022,38 @@ function joinCampaign(cmp,localState){
       setDot('','GM offline — última sincronización');
       closeModal('connectModal'); layout('player'); refreshAll();
       flash('El GM no está conectado: ves la última versión sincronizada. Los cambios locales no se compartirán.');
-    } else setStatus(reason==='nf'
-      ?'No se encontró la campaña '+cmp.code+'. Revisa: (1) el GM debe estar DENTRO de la campaña como GM ahora mismo, (2) el código es el de 6 caracteres que sale junto al nombre de su campaña, (3) ambos deben tener el mismo build (arriba).'
-      :'Tu navegador no pudo conectar con el broker de señalización (3 intentos). Test rápido: abre 0.peerjs.com en una pestaña — si no carga, tu red lo bloquea: prueba con datos móviles/otra red o modo incógnito. Si carga, el broker gratuito está caído: reintenta en unos minutos.');
+    } else setStatus(msg);
   };
-  const timer=setTimeout(offline,20000);   // covers broker retries + TURN negotiation
-  let tries=0;
-  function startPeer(){
-    tries++;
-    try{ME.peer&&ME.peer.destroy();}catch(e){}
-    ME.peer=new Peer(peerOpts());
-    ME.peer.on('open',id=>{
-      ME.id=id; ME.isHost=false; ME.role='player';
-      setStatus('Broker OK — buscando la sala '+cmp.code+'…');
-      const conn=ME.peer.connect('hh-'+cmp.code,{metadata:{name:ME.name},reliable:true});
-      ME.hostConn=conn;
-      conn.on('open',()=>{ settled=true; clearTimeout(timer);
-        document.getElementById('roomCode').textContent=cmp.code;
-        document.getElementById('roomPill').style.display='';
-        document.getElementById('roleTag').textContent='Jugador';
-        setDot('on','connected'); setStatus(''); closeModal('connectModal');
-        layout('player');
-        conn.send({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}});
-      });
-      conn.on('data',d=>playerReceive(d));
-      conn.on('close',()=>setDot('','disconnected'));
-    });
-    ME.peer.on('disconnected',()=>{try{ME.peer.reconnect();}catch(e){}});
-    ME.peer.on('error',e=>{
-      if(settled)return;
-      if(e.type==='peer-unavailable'){clearTimeout(timer); offline('nf');}
-      else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){
-        if(tries<3){ setStatus('El broker de señalización no responde — reintento '+tries+'/2…');
-          setTimeout(startPeer,2000); }
-        else { clearTimeout(timer); offline('net'); }
-      }
-      else setStatus('Error: '+e.type);
-    });
-  }
-  startPeer();
-}
-function hostRoom(){
-  ME.name=(document.getElementById('m-name').value||'GM').trim();
-  const code=rid(4).toUpperCase(); setStatus('Starting host…');
-  ME.peer=new Peer('hh-'+code,peerOpts());
-  ME.peer.on('open',id=>{
-    ME.id=id; ME.isHost=true; ME.role='gm';
-    document.getElementById('roomCode').textContent=code;
-    document.getElementById('roomPill').style.display='';
-    document.getElementById('roleTag').textContent='GM (host)';
-    setDot('host','hosting'); setStatus('Hosting '+code+'.'); closeModal('connectModal');
-    STATE.presence=[{id:'gm',name:ME.name,role:'GM'}];
-    layout('gm');
-  });
-  ME.peer.on('connection',conn=>{
-    conn.on('open',()=>{ ME.conns.push(conn); conn.send({t:'state',state:STATE}); updatePeerCount();
-      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer);
-      STATE.presence.push({id:conn.peer,name:(conn.metadata&&conn.metadata.name)||'Player',role:'Player'});
-      log(null,conn.metadata?.name||'A player',' joined the table.',true); });
-    conn.on('data',d=>hostReceive(conn,d));
-    conn.on('close',()=>{ ME.conns=ME.conns.filter(c=>c!==conn);
-      STATE.presence=(STATE.presence||[]).filter(p=>p.id!==conn.peer); updatePeerCount();
-      log(null,(conn.metadata&&conn.metadata.name)||'A player',' left the table.',true); });
-  });
-  ME.peer.on('error',e=>{ setStatus('Error: '+e.type+'. Try again.'); });
-}
-function joinRoom(){
-  ME.name=(document.getElementById('m-name').value||'Player').trim();
-  const code=(document.getElementById('m-code').value||'').trim().toUpperCase();
-  if(code.length<4){setStatus('Enter the 4-letter code.');return;}
-  setStatus('Connecting…'); ME.peer=new Peer(peerOpts());
-  ME.peer.on('open',id=>{
-    ME.id=id; ME.isHost=false; ME.role='player';
-    const conn=ME.peer.connect('hh-'+code,{metadata:{name:ME.name},reliable:true});
-    ME.hostConn=conn;
-    conn.on('open',()=>{
-      document.getElementById('roomCode').textContent=code;
+  if(!base){ offline('Todavía no hay relay configurado — pídele a tu GM la dirección y ponla en "config. de red".'); return; }
+  setStatus('Buscando al GM… (si el relay estaba dormido puede tardar ~1 min)');
+  ME.id='p-'+rid(6);
+  const url=base+'/room/'+encodeURIComponent(cmp.code)+'?role=player&id='+encodeURIComponent(ME.id)
+    +'&name='+encodeURIComponent(ME.name);
+  ME.sock=openRelaySocket(url,{
+    onopen(sock){
+      ME.socket=sock; ME.peer=sock; ME.isHost=false; ME.role='player'; settled=true;
+      document.getElementById('roomCode').textContent=cmp.code;
       document.getElementById('roomPill').style.display='';
-      document.getElementById('roleTag').textContent='Player';
-      setDot('on','connected'); setStatus('Connected!'); closeModal('connectModal');
+      document.getElementById('roleTag').textContent='Jugador';
+      setDot('on','connected'); setStatus(''); closeModal('connectModal');
       layout('player');
-      conn.send({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}});
-    });
-    conn.on('data',d=>playerReceive(d));
-    conn.on('close',()=>setDot('','disconnected'));
+      sock.send(JSON.stringify({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}}));
+    },
+    onmessage(d){
+      if(d.t==='sys'){
+        if(d.kind==='no-host'){
+          setDot('','el GM no está conectado');
+          flash('La sala existe pero el GM no está dentro ahora mismo.');
+        } else if(d.kind==='host-back'){
+          setDot('on','connected'); flash('El GM volvió a conectarse.');
+        }
+        return;
+      }
+      playerReceive(d);
+    },
+    onclose(){ setDot('','desconectado'); },
+    onfail(){ offline('No pude alcanzar la campaña '+cmp.code+'. Revisa: (1) que el GM esté DENTRO como GM ahora mismo, (2) que el código sea el correcto, (3) que ambos usen el MISMO relay.'); }
   });
-  ME.peer.on('error',e=>{ setStatus('Error: '+e.type+' (room code right & GM online?)'); });
 }
 function hostReceive(conn,d){ if(d.t!=='action')return; const a=d.action;
   if(a.kind==='hello'){
@@ -1242,10 +1238,14 @@ function applyFloorsFile(d){
 }
 function dispatch(action){
   if(ME.isHost){ apply(action); broadcast(); }
-  else if(ME.hostConn&&ME.hostConn.open){ ME.hostConn.send({t:'action',action}); }
+  else if(ME.socket&&ME.socket.readyState===WebSocket.OPEN){ ME.socket.send(JSON.stringify({t:'action',action})); }
   else { apply(action); refreshAll(); campSave(); }
 }
-function broadcast(){ refreshAll(); campSave(); ME.conns.forEach(c=>{ if(c.open)c.send({t:'state',state:STATE}); }); }
+/* Un solo envío al relay, que lo reparte a todos los jugadores. Antes había que
+   iterar una conexión por jugador; ahora el fan-out lo hace el servidor. */
+function broadcast(){ refreshAll(); campSave();
+  if(ME.isHost&&ME.socket&&ME.socket.readyState===WebSocket.OPEN)
+    ME.socket.send(JSON.stringify({t:'state',state:STATE})); }
 
 function apply(a){
   normalizeFloors();
@@ -2987,7 +2987,9 @@ function refreshAll(){
   if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id; showRollToast(STATE.lastRoll);}
   autosave();
 }
-function updatePeerCount(){const n=document.getElementById('peerCount'); if(!n)return; n.textContent=ME.isHost?`· ${ME.conns.length} player(s)`:'';}
+function updatePeerCount(){const n=document.getElementById('peerCount'); if(!n)return;
+  const players=(STATE.presence||[]).filter(p=>p.role!=='GM').length;
+  n.textContent=ME.isHost?`· ${players} player(s)`:'';}
 function setDot(cls,label){const d=document.getElementById('netdot'); d.className='dot '+(cls||''); document.getElementById('netlabel').textContent=label;}
 function setStatus(s){const e=document.getElementById('m-status'); if(e)e.textContent=s;}
 function openConnect(){document.getElementById('connectModal').classList.add('show');}
