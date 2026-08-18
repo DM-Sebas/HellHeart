@@ -60,6 +60,42 @@
   .sh-sec{display:flex;flex-direction:column;gap:8px;min-width:0}
   .sh-sec>h5{margin:0 0 2px;font-family:Georgia,serif;font-size:12px;letter-spacing:.5px;
     text-transform:uppercase;color:var(--gold);opacity:.75;border-bottom:1px solid var(--line);padding-bottom:3px}
+  /* ---- Rules tab: section nav + filter chips + catalogue sections ---- */
+  #ruleNav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  #ruleNav button{background:transparent;border:1px solid transparent;border-radius:6px;
+    color:var(--dim);padding:5px 12px;font-family:Georgia,serif;font-size:13px}
+  #ruleNav button:hover{color:var(--ink);border-color:var(--line)}
+  #ruleNav button.on{color:var(--gold);border-color:var(--gold);background:#241d16}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+  .chip{font-size:11px;padding:2px 9px;border-radius:12px;background:transparent;
+    border:1px solid var(--line);color:var(--dim);cursor:pointer;line-height:1.5}
+  .chip:hover{border-color:var(--cc,var(--gold));color:var(--cc,var(--gold))}
+  .chip.on{background:var(--cc,var(--gold));border-color:var(--cc,var(--gold));color:#15110f;font-weight:700}
+  .chipsep{width:1px;height:16px;background:var(--line);margin:0 3px}
+  .catsec{margin-bottom:18px}
+  .catsec h3{margin:0 0 8px;font-size:16px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  #panel-rules .cardgrid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  /* Resources row: the pips take only what they need, and the portrait claims all the
+     space left over, stretching to the full height of the block (align-items:stretch)
+     — that empty right-hand gap is exactly what the portrait is there to fill. */
+  .resrow{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .pipstack{flex:0 1 auto;min-width:196px;display:flex;flex-direction:column;gap:8px}
+  .portrait{flex:1 1 200px;min-width:160px;min-height:210px;position:relative;overflow:hidden;
+    border:1px dashed var(--line);border-radius:10px;background:#120e0c;
+    display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}
+  .portrait.has{border-style:solid;border-color:var(--gold)}
+  .portrait.ro{cursor:default}
+  /* absolutely positioned so the image never drives the box height — otherwise a tall
+     photo stretches the whole Resources block instead of filling the gap beside it */
+  .portrait img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .portrait .ph{font-size:11px;color:var(--dim);padding:8px;line-height:1.4}
+  .portrait .ph .mut{font-size:10px;opacity:.7}
+  .portrait.drop{border-color:var(--gold);border-style:solid;box-shadow:0 0 0 2px rgba(214,166,74,.35) inset}
+  .portrait .rm{position:absolute;top:4px;right:4px;width:20px;height:20px;padding:0;
+    border-radius:50%;font-size:11px;line-height:1;background:rgba(21,17,15,.78);
+    border:1px solid var(--line);color:var(--ink);cursor:pointer;display:none}
+  .portrait:hover .rm{display:block}
+  .portrait .rm:hover{border-color:var(--crimson);color:#e8a39c}
   .shsub{font-family:Georgia,serif;font-size:11px;letter-spacing:.4px;text-transform:uppercase;
     color:var(--dim);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
   .sh-sec>h3{margin:6px 0 0}
@@ -226,6 +262,9 @@
      multiclassed sheet shows at a glance which class each feature came from */
   .badge.cls{border-color:var(--cc,var(--dim));color:var(--cc,var(--dim));font-weight:700;letter-spacing:.3px}
   .badge.mc{border-color:#e0952f;color:#15110f;background:#e0952f;font-weight:700;letter-spacing:.3px}
+  /* gear property badges: outlined in their own colour so they read as attributes,
+     leaving the filled kind badge as the card's single dominant mark */
+  .badge.tint{border-color:var(--tc,var(--line));color:var(--tc,var(--dim));font-weight:600}
   .gcard.mcard{border-style:dashed}
   .gcard.mcard .top{border-bottom-style:dashed}
   /* subclass ladder: the left border thickens as the tier climbs, so the steps
@@ -560,7 +599,15 @@
 
   <!-- RULES -->
   <div class="panel scroll" id="panel-rules" data-pane="rules" data-label="Rules">
-    <input id="ruleSearch" placeholder="search SRD rules…" style="width:100%;margin-bottom:8px" oninput="renderRules()">
+    <div class="rulenav" id="ruleNav">
+      <button data-sec="rules"   onclick="setRuleSec('rules')">Reglas</button>
+      <button data-sec="classes" onclick="setRuleSec('classes')">Clases</button>
+      <button data-sec="domains" onclick="setRuleSec('domains')">Dominios</button>
+      <button data-sec="gear"    onclick="setRuleSec('gear')">Equipo</button>
+    </div>
+    <input id="ruleSearch" placeholder="buscar…" style="width:100%;margin-bottom:6px" oninput="renderRules()">
+    <div id="ruleChips" class="chips"></div>
+    <div id="ruleCount" class="muted" style="font-size:11px;margin:2px 0 8px"></div>
     <div id="ruleList"></div>
     <p class="muted" style="font-size:11px;margin-top:10px"><span class="raw">RAW</span> = Daggerheart SRD 1.0 (Darrington Press 2025). <span class="hb">HB/RAI</span> = homebrew/interpretation.</p>
   </div>
@@ -1286,6 +1333,7 @@ function blankChar(id,name){return{ id,name:name||'New Hero',owner:id,playerName
   evasion:10,major:6,severe:13, hp:0,hpmax:6,stress:0,stressmax:6,hope:2,armor:0,armormax:3,
   gold:0,experiences:'',notes:'',dread:0,dreadmax:8,traumas:'', subclassTier:1,
   multiclass:null, mcDomain:null, mcSubclass:null,   // SRD p.43: one domain, one subclass foundation
+  portrait:null,                                     // downscaled data URI — see portraitFromURL()
   loadout:[],vault:[], advances:[], activeCards:{},
   armorItem:null, primary:null, secondary:null, gear:[] };}
 function makeChar(id,name){STATE.characters[id]=blankChar(id,name);}
@@ -1461,14 +1509,16 @@ function renderOneSheet(ch){
             <input ${dis} type="number" value="${ch[t]}" onchange="editC('${ch.id}','${t}',+this.value)"></div>`;}).join('')}</div>
 
         <div class="shsub">Resources</div>
-        <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div style="flex:1;min-width:0"><label>HP (mark on damage)</label><div class="pips">${pips(ch,'hp','hpmax','hp',ed)}</div></div>
-          ${ed?`<button class="sm" onclick="dmg('${ch.id}')">take damage…</button>`:''}
+        <div class="resrow">
+          ${portraitHTML(ch,ed)}
+          <div class="pipstack">
+            <div><label>HP (mark on damage)</label><div class="pips">${pips(ch,'hp','hpmax','hp',ed)}</div></div>
+            <div><label>Stress</label><div class="pips">${pips(ch,'stress','stressmax','st',ed)}</div></div>
+            <div><label>Hope (max 6)</label><div class="pips">${pips(ch,'hope','__6','ho',ed)}</div></div>
+            <div><label>Dread (gauge of ${ch.dreadmax||8})</label><div class="pips">${pips(ch,'dread','dreadmax','dr',ed)}</div></div>
+            <div><label>Armor slots (${eff.armormax})</label><div class="pips">${pipsN(ch,'armor',eff.armormax,'ar',ed)}</div></div>
+          </div>
         </div>
-        <div><label>Stress</label><div class="pips">${pips(ch,'stress','stressmax','st',ed)}</div></div>
-        <div><label>Hope (max 6)</label><div class="pips">${pips(ch,'hope','__6','ho',ed)}</div></div>
-        <div><label>Dread (gauge of ${ch.dreadmax||8})</label><div class="pips">${pips(ch,'dread','dreadmax','dr',ed)}</div></div>
-        <div><label>Armor slots (${eff.armormax})</label><div class="pips">${pipsN(ch,'armor',eff.armormax,'ar',ed)}</div></div>
 
         <div class="shsub">Story</div>
         <div class="col"><label>Notes</label><textarea ${dis} rows="3" onchange="editC('${ch.id}','notes',this.value)">${esc(ch.notes)}</textarea></div>
@@ -1510,12 +1560,8 @@ function equipmentSection(ch,ed){
 }
 function equipCardHTML(e,ch,ed,slot,kind){
   const mods=[]; if(e.evasionMod)mods.push((e.evasionMod>0?'+':'')+e.evasionMod+' Eva'); if(e.majorMod)mods.push((e.majorMod>0?'+':'')+e.majorMod+' Maj'); if(e.severeMod)mods.push((e.severeMod>0?'+':'')+e.severeMod+' Sev'); if(e.scoreMod)mods.push((e.scoreMod>0?'+':'')+e.scoreMod+' Arm');
-  let meta=[];
-  if(kind==='weapon')meta=[e.trait,e.range,(e.damageDice+(e.damageBonus?'+'+e.damageBonus:'')+' '+(e.damageType||'phy')),e.burden];
-  else if(kind==='armor')meta=['Major '+e.baseMajor,'Severe '+e.baseSevere,'Score '+e.baseScore];
-  else meta=[e.category||'Item'];
   return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span class="badge eqp">equipped</span></div>
-    <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${meta.filter(Boolean).map(m=>`<span class="badge">${esc(m)}</span>`).join('')}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
+    <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${gearMetaBadges(e,kind)}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
     ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}
     ${ed?`<div class="acts"><button class="xs danger" onclick="unequip('${ch.id}','${slot}')">unequip</button></div>`:''}
   </div>`;
@@ -1636,6 +1682,62 @@ const DOMAIN_COLOR={
   'Research':'#4a83c9'        // the lab and the library — blue
 };
 const KIND_COLOR={armor:'#7f93a8', weapon:'#c0524a', item:'#c8a24a'};
+/* Gear properties get their own colours so a card is scannable without reading it:
+   whether a weapon is your primary or a backup, which trait rolls it, and which
+   discipline an item belongs to. These are outlined rather than filled — the kind
+   badge stays the one solid fill, so the hierarchy survives. */
+const WTYPE_COLOR={Primary:'#e0b23c', Secondary:'#8fa0b5'};
+const TRAIT_COLOR={agility:'#5aa46a', strength:'#c0524a', finesse:'#4a90c9',
+                   instinct:'#c9a227', presence:'#c07fb0', knowledge:'#9a63d0'};
+function traitColor(t){return TRAIT_COLOR[String(t||'').toLowerCase()]||null;}
+function wTypeColor(t){return WTYPE_COLOR[String(t||'').trim()]||null;}
+/* Item categories reuse the domain palette, but the gear data doesn't always spell
+   them the same way as the domain list ("Artefact" vs the "Artefacts" domain), so
+   compare with trailing plurals stripped instead of matching exactly. */
+function categoryColor(cat){
+  const c=String(cat||'').trim(); if(!c)return null;
+  if(DOMAIN_COLOR[c])return DOMAIN_COLOR[c];
+  const norm=s=>s.toLowerCase().replace(/s$/,'');
+  const key=Object.keys(DOMAIN_COLOR).find(d=>norm(d)===norm(c));
+  return key?DOMAIN_COLOR[key]:null;
+}
+/* An outlined badge uses its colour AS the text, at 10px — several of the domain and
+   trait hues are too dark for that against the card ground. Lighten until the ratio
+   clears AA rather than hand-picking a second palette that could drift out of sync. */
+const CARD_LUM=0.0121;                    // luminance of the card background (#201a14)
+function legibleTint(color){
+  let c=color;
+  for(let i=0;i<8;i++){
+    const l=lumOf(c);
+    const ratio=(Math.max(l,CARD_LUM)+0.05)/(Math.min(l,CARD_LUM)+0.05);
+    if(ratio>=4.5)return c;
+    c=shade(c,0.10);
+  }
+  return c;
+}
+/* a badge tinted with an arbitrary colour, falling back to the plain neutral one */
+function tintBadge(text,color){
+  return color?`<span class="badge tint" style="--tc:${legibleTint(color)}">${esc(text)}</span>`
+              :`<span class="badge">${esc(text)}</span>`;
+}
+/* the coloured property badges shared by the sheet and the catalogue */
+function gearMetaBadges(e,kind){
+  const out=[];
+  if(kind==='weapon'){
+    if(e.type)out.push(tintBadge(e.type,wTypeColor(e.type)));
+    if(e.trait)out.push(tintBadge(e.trait,traitColor(e.trait)));
+    if(e.range)out.push(tintBadge(e.range,null));
+    out.push(tintBadge(e.damageDice+(e.damageBonus?'+'+e.damageBonus:'')+' '+(e.damageType||'phy'),null));
+    if(e.burden)out.push(tintBadge(e.burden,null));
+  }else if(kind==='armor'){
+    out.push(tintBadge('Major '+e.baseMajor,null));
+    out.push(tintBadge('Severe '+e.baseSevere,null));
+    out.push(tintBadge('Score '+e.baseScore,null));
+  }else{
+    if(e.category)out.push(tintBadge(e.category,categoryColor(e.category)));
+  }
+  return out.join('');
+}
 /* Class, subclass and its specialisations are one progression from one source, so
    they share one hue — the character's class colour — and separate by intensity
    instead of by unrelated hues. A MARINE's whole kit reads as reds, an OCCULTIST's
@@ -1812,10 +1914,81 @@ function newChar(){
   if(!ME.isHost&&Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release or delete your current character first.');return;}
   openCreator();}
 function delChar(id){if(confirm('Delete this character?'))dispatch({kind:'delchar',id});}
-function dmg(id){const ch=STATE.characters[id]; if(!ch)return; const eff=effStats(ch); const raw=prompt('Incoming damage (after armor)?'); if(raw===null)return; const d=+raw; if(isNaN(d))return;
-  let marks=1,tier='minor'; if(d<=0){marks=0;tier='none';} else if(d>=eff.severe*2){marks=4;tier='MASSIVE';} else if(d>=eff.severe){marks=3;tier='severe';} else if(d>=eff.major){marks=2;tier='major';}
-  dispatch({kind:'resource',id,field:'hp',value:Math.min(ch.hpmax,(ch.hp||0)+marks)});
-  log(null,ch.name,` takes ${d} damage → ${tier} (mark ${marks} HP).`,true);}
+/* ---- character portrait ----
+   The image lives on the character as a data URI, which means it rides along in every
+   P2P state broadcast and in the campaign autosave. So it is ALWAYS downscaled and
+   re-encoded before being stored — a raw phone photo would be megabytes and would blow
+   the localStorage quota and choke the sync. 256px square JPEG lands around 20–40KB. */
+const PORTRAIT_MAX=512, PORTRAIT_Q=0.82;
+function portraitHTML(ch,ed){
+  const p=ch.portrait||'';
+  const acts=ed?`ondragover="portraitOver(event,1)" ondragleave="portraitOver(event,0)" ondrop="portraitDrop(event,'${ch.id}')" onclick="portraitPick('${ch.id}')" title="arrastra una imagen aquí, o haz click para buscarla"`:'';
+  return `<div class="portrait${ed?'':' ro'}${p?' has':''}" ${acts}>
+    ${p?`<img src="${p}" alt="retrato de ${esc(ch.name)}">`:
+        `<div class="ph">${ed?'Retrato<br><span class="mut">arrastra una imagen<br>o haz click</span>':'sin retrato'}</div>`}
+    ${p&&ed?`<button class="rm" title="quitar retrato" onclick="event.stopPropagation();portraitClear('${ch.id}')">✕</button>`:''}
+  </div>`;
+}
+function portraitOver(ev,on){ ev.preventDefault(); ev.stopPropagation();
+  ev.currentTarget.classList.toggle('drop',!!on); }
+function portraitDrop(ev,id){
+  ev.preventDefault(); ev.stopPropagation();
+  ev.currentTarget.classList.remove('drop');
+  const dt=ev.dataTransfer; if(!dt)return;
+  const f=(dt.files&&dt.files[0])||null;
+  if(f){portraitFile(f,id);return;}
+  // dragged from another browser tab rather than the filesystem
+  const uri=dt.getData('text/uri-list')||dt.getData('text/plain');
+  if(uri&&/^(https?:|data:image\/)/.test(uri))portraitFromURL(uri,id);
+  else flash('Arrastra un archivo de imagen.');
+}
+function portraitPick(id){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.onchange=()=>{ if(inp.files&&inp.files[0])portraitFile(inp.files[0],id); };
+  inp.click();
+}
+function portraitFile(file,id){
+  if(!file)return;
+  if(!/^image\//.test(file.type||'')){flash('Eso no es una imagen.');return;}
+  if(file.size>25*1024*1024){flash('Imagen demasiado grande (máx 25 MB).');return;}
+  const fr=new FileReader();
+  fr.onerror=()=>flash('No pude leer el archivo.');
+  fr.onload=()=>portraitFromURL(fr.result,id);
+  fr.readAsDataURL(file);
+}
+function portraitFromURL(src,id){
+  const ch=STATE.characters[id]; if(!ch||!canEdit(ch)){flash('No puedes editar este personaje.');return;}
+  const img=new Image();
+  img.crossOrigin='anonymous';                 // needed to keep the canvas untainted
+  img.onerror=()=>flash('No pude cargar esa imagen.');
+  img.onload=()=>{
+    try{
+      const iw=img.naturalWidth, ih=img.naturalHeight;
+      if(!iw||!ih){flash('Imagen vacía.');return;}
+      /* Keep the original aspect ratio and only bound the longest side. The display box
+         crops with object-fit:cover, so cropping here too would throw away image the
+         frame could have used. */
+      const k=Math.min(1,PORTRAIT_MAX/Math.max(iw,ih));
+      const w=Math.max(1,Math.round(iw*k)), h=Math.max(1,Math.round(ih*k));
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      const x=cv.getContext('2d'); x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+      x.drawImage(img,0,0,iw,ih,0,0,w,h);
+      const data=cv.toDataURL('image/jpeg',PORTRAIT_Q);
+      const c=copyChar(id); if(!c)return;
+      c.portrait=data; dispatch({kind:'upchar',char:c});
+      flash('Retrato actualizado ('+Math.round(data.length/1024)+' KB)');
+    }catch(e){
+      // a remote image without CORS headers taints the canvas and toDataURL throws
+      flash('Esa imagen no se puede procesar — descárgala y arrástrala como archivo.');
+    }
+  };
+  img.src=src;
+}
+function portraitClear(id){
+  const c=copyChar(id); if(!c)return;
+  c.portrait=null; dispatch({kind:'upchar',char:c}); flash('Retrato quitado');
+}
 function moveCard(id,key,to){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); if(ch.activeCards)delete ch.activeCards[key];
   if(to==='loadout'){ if(ch.loadout.length>=LOADOUT_MAX){alert('Loadout full ('+LOADOUT_MAX+').');return;} ch.loadout.push(key);} else ch.vault.push(key);
   dispatch({kind:'upchar',char:ch});}
@@ -2675,8 +2848,126 @@ const RULES=[
 {t:'Leveling',tags:'level tier advancement',b:`<p>10 levels, 4 tiers (1 / 2-4 / 5-7 / 8-10). Each level: pick 2 advancements + a new domain card. Levels 2/5/8: +1 Proficiency & a new Experience.</p>`},
 {t:'Adversaries & Countdowns',tags:'gm adversary countdown npc tier',b:`<p>Adversaries have a Tier, type, Difficulty, thresholds, HP/Stress, an attack, and features (some cost Fear). <b>Countdowns</b> track looming events: advance them on certain rolls or as moves; when full, they trigger.</p>`},
 ];
-function renderRules(){const inp=document.getElementById('ruleSearch'); if(!inp)return; const q=(inp.value||'').toLowerCase(); const list=document.getElementById('ruleList');
-  list.innerHTML=RULES.filter(r=>!q||(r.t+' '+r.tags+' '+r.b).toLowerCase().includes(q)).map(r=>`<div class="rule${q?' open':''}"><h4 onclick="this.parentElement.classList.toggle('open')">${r.t}<span class="raw">RAW</span></h4><div class="body">${r.b}</div></div>`).join('')||'<p class="muted">No match.</p>';}
+/* ================= RULES / CATALOGUE =================
+   The Rules tab is a browser over everything in the SRD data: the rule summaries plus
+   read-only catalogues of every class, domain card and piece of gear. Catalogue entries
+   are drawn with the same .gcard markup and the same accent colours as the character
+   sheet, so a card looks identical whether you own it or are just looking it up. */
+let ruleSec='rules';
+let ruleFilter={cls:null, domain:null, kind:null, level:null};
+function setRuleSec(s){
+  if(ruleSec!==s){ruleSec=s; ruleFilter={cls:null,domain:null,kind:null,level:null};}
+  const inp=document.getElementById('ruleSearch');
+  if(inp)inp.placeholder=s==='rules'?'buscar en las reglas…':s==='classes'?'buscar clase, subclase o feature…'
+        :s==='domains'?'buscar carta de dominio…':'buscar arma, armadura u objeto…';
+  renderRules();
+}
+function ruleToggle(k,v){ ruleFilter[k]=(ruleFilter[k]===v?null:v); renderRules(); }
+function chip(k,v,label,color){
+  const on=ruleFilter[k]===v;
+  // the arg is inlined into an onclick attribute, so quote strings with single quotes
+  // (JSON.stringify would emit double quotes and blow the attribute apart)
+  const arg=(typeof v==='number')?v:`'${String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'`;
+  return `<button class="chip${on?' on':''}"${color?` style="--cc:${color}"`:''} onclick="ruleToggle('${k}',${arg})">${esc(label)}</button>`;
+}
+/* ---- read-only card renderers (no character, so no actions) ---- */
+function catDomainCard(c){
+  const typeBadge=(c.type==='Spell'||c.type==='Grimoire')?'badge spell':'badge feat';
+  return `<div class="gcard"${accentAttr(domainColor(c.domain))}>
+    <div class="top"><span class="nm">${esc(c.name)}</span><span class="badge lvl">Lv ${c.level}</span></div>
+    <div class="meta"><span class="badge dom">${esc(c.domain)}</span><span class="${typeBadge}">${esc(c.type||'Ability')}</span><span class="badge">Recall ${c.recall||0}</span></div>
+    <div class="txt">${esc(c.text)}</div></div>`;
+}
+function catGearCard(e,kind){
+  const mods=[]; if(e.evasionMod)mods.push((e.evasionMod>0?'+':'')+e.evasionMod+' Eva');
+  if(e.majorMod)mods.push((e.majorMod>0?'+':'')+e.majorMod+' Maj');
+  if(e.severeMod)mods.push((e.severeMod>0?'+':'')+e.severeMod+' Sev');
+  if(e.scoreMod)mods.push((e.scoreMod>0?'+':'')+e.scoreMod+' Arm');
+  return `<div class="gcard"${accentAttr(KIND_COLOR[kind])}>
+    <div class="top"><span class="nm">${esc(e.name)}</span><span>${e.tier?`<span class="badge lvl">T${e.tier}</span> `:''}${e.credit!=null?`<span class="badge">◈ ${e.credit}</span>`:''}</span></div>
+    <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${gearMetaBadges(e,kind)}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
+    ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}</div>`;
+}
+function catFeatCard(nm,txt,cat,label,cls,extra){
+  return `<div class="gcard${cat==='foundation'?' t1':cat==='specialization'?' t2':cat==='mastery'?' t3':''}"${accentAttr(featureColor(cat,cls))}>
+    <div class="top"><span class="nm">${esc(nm)}</span><span class="badge dom">${esc(label)}</span></div>
+    <div class="meta">${cls?`<span class="badge cls"${classColor(cls)?` style="--cc:${classColor(cls)}"`:''}>${esc(cls)}</span>`:''}${(extra||[]).map(m=>`<span class="badge">${esc(m)}</span>`).join('')}</div>
+    <div class="txt">${esc(txt)}</div></div>`;
+}
+/* ---- sections ---- */
+function secClasses(q){
+  const names=Object.keys(SRD.classes).filter(c=>!ruleFilter.cls||ruleFilter.cls===c);
+  let html='', n=0;
+  names.forEach(cn=>{
+    const c=SRD.classes[cn]; const items=[];
+    (c.features||[]).forEach(f=>items.push({nm:f.name,txt:f.text,cat:'class',label:'Class',extra:[]}));
+    if(c.hopeFeature)items.push({nm:c.hopeFeature.name,txt:c.hopeFeature.text,cat:'class',label:'Class',extra:['Hope feature']});
+    (c.subclasses||[]).forEach(s=>{
+      if(s.spellcast)items.push({nm:'Domain Trait',txt:'Casts with '+s.spellcast+'.',cat:'foundation',label:'Foundation',extra:[s.name]});
+      (s.foundation||[]).forEach(f=>items.push({nm:f.name,txt:f.text,cat:'foundation',label:'Foundation',extra:[s.name]}));
+      (s.specialization||[]).forEach(f=>items.push({nm:f.name,txt:f.text,cat:'specialization',label:'Specialization',extra:[s.name]}));
+      (s.mastery||[]).forEach(f=>items.push({nm:f.name,txt:f.text,cat:'mastery',label:'Mastery',extra:[s.name]}));
+    });
+    const hit=items.filter(i=>!q||(cn+' '+i.nm+' '+i.txt+' '+i.extra.join(' ')).toLowerCase().includes(q));
+    if(!hit.length)return;
+    n+=hit.length;
+    const col=classColor(cn)||'var(--gold)';
+    html+=`<div class="catsec"><h3 style="color:${col}">${esc(cn)}
+      <span class="muted" style="font-size:11px;font-family:var(--sans,inherit)">
+        ${(c.domains||[]).map(d=>`<span class="badge dom" style="--dc:${domainColor(d)||'#8a7a5a'};background:${domainColor(d)||'#3a2f26'};color:#15110f">${esc(d)}</span>`).join(' ')}
+        · Evasion ${c.evasion} · HP ${c.hp} · ${(c.subclasses||[]).length} subclases</span></h3>
+      <div class="cardgrid">${hit.map(i=>catFeatCard(i.nm,i.txt,i.cat,i.label,cn,i.extra)).join('')}</div></div>`;
+  });
+  return {html:html||'<p class="muted">Sin resultados.</p>', n};
+}
+function secDomains(q){
+  let all=[];
+  Object.keys(SRD.domains).forEach(d=>{ if(ruleFilter.domain&&ruleFilter.domain!==d)return;
+    (SRD.domains[d]||[]).forEach(c=>all.push(c)); });
+  if(ruleFilter.level)all=all.filter(c=>c.level===ruleFilter.level);
+  const hit=all.filter(c=>!q||(c.name+' '+c.domain+' '+(c.type||'')+' '+c.text).toLowerCase().includes(q));
+  hit.sort((a,b)=>a.level-b.level||a.domain.localeCompare(b.domain)||a.name.localeCompare(b.name));
+  return {html:hit.length?`<div class="cardgrid">${hit.map(catDomainCard).join('')}</div>`:'<p class="muted">Sin resultados.</p>', n:hit.length};
+}
+function secGear(q){
+  const groups=[['armor','Armaduras',EQUIP.armor||[]],['weapon','Armas',EQUIP.weapons||[]],['item','Objetos',EQUIP.items||[]]];
+  let html='', n=0;
+  groups.forEach(([kind,title,arr])=>{
+    if(ruleFilter.kind&&ruleFilter.kind!==kind)return;
+    const hit=arr.filter(e=>!q||JSON.stringify(e).toLowerCase().includes(q));
+    if(!hit.length)return; n+=hit.length;
+    html+=`<div class="catsec"><h3 style="color:${KIND_COLOR[kind]}">${title} <span class="muted" style="font-size:11px">${hit.length}</span></h3>
+      <div class="cardgrid">${hit.map(e=>catGearCard(e,kind)).join('')}</div></div>`;
+  });
+  return {html:html||'<p class="muted">Sin resultados.</p>', n};
+}
+function renderRules(){
+  const inp=document.getElementById('ruleSearch'); if(!inp)return;
+  const q=(inp.value||'').toLowerCase().trim();
+  const list=document.getElementById('ruleList'), chips=document.getElementById('ruleChips'),
+        cnt=document.getElementById('ruleCount');
+  document.querySelectorAll('#ruleNav button').forEach(b=>b.classList.toggle('on',b.dataset.sec===ruleSec));
+  let out, chipHTML='';
+  if(ruleSec==='classes'){
+    chipHTML=Object.keys(SRD.classes).map(c=>chip('cls',c,c,classColor(c))).join('');
+    out=secClasses(q);
+  }else if(ruleSec==='domains'){
+    chipHTML=Object.keys(SRD.domains).map(d=>chip('domain',d,d,domainColor(d))).join('')
+      +'<span class="chipsep"></span>'
+      +[1,2,3,4,5,6,7,8,9,10].map(l=>chip('level',l,'Lv '+l)).join('');
+    out=secDomains(q);
+  }else if(ruleSec==='gear'){
+    chipHTML=[['armor','Armaduras'],['weapon','Armas'],['item','Objetos']]
+      .map(([k,t])=>chip('kind',k,t,KIND_COLOR[k])).join('');
+    out=secGear(q);
+  }else{
+    const hit=RULES.filter(r=>!q||(r.t+' '+r.tags+' '+r.b).toLowerCase().includes(q));
+    out={n:hit.length, html:hit.map(r=>`<div class="rule${q?' open':''}"><h4 onclick="this.parentElement.classList.toggle('open')">${r.t}<span class="raw">RAW</span></h4><div class="body">${r.b}</div></div>`).join('')||'<p class="muted">Sin resultados.</p>'};
+  }
+  if(chips)chips.innerHTML=chipHTML;
+  if(cnt)cnt.textContent=out.n?(out.n+(ruleSec==='rules'?' regla':' ficha')+(out.n===1?'':'s')):'';
+  list.innerHTML=out.html;
+}
 
 /* ================= PLUMBING ================= */
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
