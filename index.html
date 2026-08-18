@@ -167,10 +167,74 @@
   .expand.b{bottom:6px;left:50%;transform:translateX(-50%)}
   .expand.l{left:6px;top:50%;transform:translateY(-50%)}
   .expand.r{right:6px;top:50%;transform:translateY(-50%)}
-  #initpanel{width:250px;flex:0 0 auto;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  /* ---- columna lateral única con pestañas ---- */
+  #sidecol{width:266px;flex:0 0 auto;border-left:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;min-height:0}
+  #sidetabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
+  #sidetabs button{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;
+    color:var(--dim);font:12px Georgia,serif;padding:7px 4px;cursor:pointer}
+  #sidetabs button:hover{color:var(--ink)}
+  #sidetabs button.on{color:var(--gold);border-bottom-color:var(--gold);background:#241d16}
+  .sidepane{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  #roomlist{overflow:auto;flex:1;min-height:60px}
+  #roomdetail{border-top:1px solid var(--line);overflow:auto;max-height:46%}
+  .rmrow{padding:7px 9px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:8px;align-items:flex-start}
+  .rmrow:hover{background:#241d16}
+  .rmrow.sel{background:#2a2118;box-shadow:inset 3px 0 0 var(--gold)}
+  .rmrow .sw{width:10px;height:10px;border-radius:3px;flex:none;margin-top:3px;border:1px solid rgba(0,0,0,.45)}
+  .rmrow .nm{font-size:12.5px;font-weight:600}
+  .rmrow.off .nm{opacity:.5;text-decoration:line-through}
+  .rmrow .mt{font-size:10px;color:var(--dim);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+  .rmrow .eye{margin-left:auto;font-size:12px;flex:none;opacity:.7}
+  #roomdetail .fld{padding:6px 9px;border-bottom:1px solid var(--line)}
+  #roomdetail .fld label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px}
+  #roomdetail input,#roomdetail textarea{width:100%;font-size:12px}
+  /* filas de enemigo / objeto dentro de la pieza */
+  .rmitem{display:flex;align-items:center;gap:6px;padding:3px 5px;border:1px solid var(--line);
+    border-radius:5px;background:#120e0c;margin-bottom:3px}
+  .rmitem .n{font-size:11.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rmitem .mt{font-size:10px;color:var(--dim);margin-left:auto;white-space:nowrap}
+  .rmitem .qty{display:flex;align-items:center;gap:3px;flex:none}
+  .rmitem .qty b{font-size:11px;min-width:14px;text-align:center}
+  /* buscador del catálogo, embebido en el panel (sin modal) */
+  .rmpicker{margin-top:5px;border:1px solid var(--gold);border-radius:6px;padding:5px;background:#1d1712}
+  #rplist{max-height:170px;overflow:auto;margin-top:4px}
+  .rpitem{display:flex;gap:6px;align-items:center;padding:3px 5px;border-radius:4px;cursor:pointer}
+  .rpitem:hover{background:#2a2118}
+  .rpitem .n{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rpitem .mt{font-size:10px;color:var(--dim);margin-left:auto;white-space:nowrap}
+  /* ---- barra de herramientas (fuera del desplegable de terreno) ---- */
+  #modebar{display:flex;gap:3px;flex-wrap:wrap}
+  .mbtn{display:flex;align-items:center;gap:5px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:6px;color:var(--dim);padding:3px 8px;font-size:11px;cursor:pointer;line-height:1.6}
+  .mbtn:hover{border-color:var(--gold);color:var(--ink)}
+  .mbtn.on{border-color:var(--gold);background:var(--gold);color:#1a1613;font-weight:700}
+  .mbtn .ic{font-size:13px}
+  @media(max-width:900px){.mbtn .lb{display:none}}
+  /* ---- paleta de terreno plegable ---- */
+  #tilewrap{border-top:1px solid var(--line)}
+  #tilewrap>summary{list-style:none;cursor:pointer;padding:5px 8px;font-size:11px;color:var(--dim);
+    display:flex;align-items:center;gap:7px}
+  #tilewrap>summary::-webkit-details-marker{display:none}
+  #tilewrap>summary:hover{color:var(--ink)}
+  #tilewrap>summary .cv{transition:transform .15s;font-size:9px}
+  #tilewrap[open]>summary .cv{transform:rotate(90deg)}
+  #tilewrap>summary .cur{margin-left:auto;display:flex;align-items:center;gap:5px;color:var(--gold);font-size:11px}
+  #tilewrap>summary .cur i{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.4)}
+  /* ---- estilo papel del mapa ---- */
+  /* La roca es un rayado diagonal repetido sobre el fondo de la grilla; las celdas de
+     suelo se pintan encima, así que el rayado sólo asoma donde no hay nada excavado. */
+  #mapwrap.paper{background:#cfc6b2}
+  #mapwrap.paper #grid{border-color:#1a1714;
+    background:repeating-linear-gradient(45deg,#d9d0bd 0 2px,#c6bda8 2px 5px)}
+  #mapwrap.paper .cell{border-color:rgba(120,140,160,.28)}
+  #mapwrap.paper .cell.rock{border-color:transparent}
+  #mapwrap.paper .wall{background:#1a1714;box-shadow:none}
+  #mapwrap.paper .door{background:#8a5a1e;box-shadow:none}
+  #initpanel{flex:1;display:flex;flex-direction:column;min-height:0}
   #initpanel .hd{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--gold);font-family:Georgia,serif;display:flex;justify-content:space-between;align-items:center}
   #initlist{flex:1;overflow:auto;padding:8px}
-  #aspectpanel{width:190px;flex:0 0 auto;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  #aspectpanel{flex:1;display:flex;flex-direction:column;min-height:0}
   #aspectpanel .hd{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--gold);font-family:Georgia,serif;display:flex;justify-content:space-between;align-items:center}
   #aspectlist{flex:1;overflow:auto;padding:8px}
   .asprow{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--line);border-radius:6px;padding:5px 6px;margin-bottom:5px;font-size:12px;line-height:1.3}
@@ -182,6 +246,13 @@
   .asprow .del{cursor:pointer;color:#8d8375;flex:0 0 auto}
   .asprow .del:hover{color:#c86a5a}
   .initrow{display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:5px;margin-bottom:5px;background:var(--panel2)}
+  /* El nombre de la campaña se edita en el sitio: sin prompt(), que este navegador bloquea. */
+  .campname{flex:1;min-width:0;background:transparent;border:1px solid transparent;border-radius:4px;
+    color:var(--ink);font:600 13px/1.3 inherit;padding:3px 5px}
+  .campname:hover{border-color:var(--line)}
+  .campname:focus{outline:none;border-color:var(--gold);background:var(--panel)}
+  .needfill{border-color:#d6a64a !important;box-shadow:0 0 0 3px rgba(214,166,74,.28);animation:needpulse .6s ease-in-out 3}
+  @keyframes needpulse{50%{box-shadow:0 0 0 6px rgba(214,166,74,.10)}}
   .initrow.act{border-color:var(--gold);box-shadow:0 0 5px rgba(214,166,74,.4)}
   .initrow input{flex:1;min-width:0}
 
@@ -327,7 +398,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>🜂 HellHeart VTT</h1>
+    <h1>🜂 HellHeart VTT <span id="verTag" style="font:600 11px/1 system-ui;color:var(--gold);opacity:.75;vertical-align:super"></span></h1>
     <span class="tag" id="roleTag">solo</span>
     <span class="pill"><span class="dot" id="netdot"></span><span id="netlabel">offline</span></span>
     <span class="pill" id="roomPill" style="display:none;cursor:pointer" onclick="openRoom()" title="see who's at the table">Room <b id="roomCode" style="color:var(--gold)">—</b> <button class="xs" onclick="event.stopPropagation();gmSelfTest()" title="probar si tu sala es alcanzable desde internet">🧪</button>
@@ -365,6 +436,7 @@
         <button class="xs gmonly" onclick="renameFloor()" title="rename this floor">✎</button>
         <button class="xs gmonly" onclick="delFloor()" title="delete this floor">🗑</button>
         <span class="mtsep"></span>
+        <button class="xs" id="skinBtn" onclick="toggleMapSkin()" title="cambia entre el mapa en tinta sobre papel y el estilo oscuro">🗺 papel</button>
         <span id="zoomctl" style="display:flex;gap:2px;align-items:center"><button class="xs" onclick="setZoom(mapZoom/1.25,null)" title="zoom out (wheel)">−</button><span id="zoomlbl" onclick="setZoom(1,null)" title="reset zoom" style="cursor:pointer;font-size:11px;min-width:34px;text-align:center">100%</span><button class="xs" onclick="setZoom(mapZoom*1.25,null)" title="zoom in (wheel)">+</button></span>
         <select id="scaleSel" class="gmonly" onchange="setScale(+this.value)" title="feet per square (affects range rings)">
           <option value="5">5 ft/sq</option><option value="10">10 ft/sq</option><option value="20">20 ft/sq</option>
@@ -376,7 +448,11 @@
         <span class="muted" style="font-size:11px">double-click a token = range rings · arrows: pan</span>
       </div>
       <div class="mtrow"><!-- fila 2: edición -->
-        <div id="hotbar" title="1–9/0: blocks · P: props · F: fog · S: area select · L place · R remove"></div>
+        <div id="modebar"></div>
+        <details id="tilewrap"><summary><span class="cv">▶</span> Tipo de casilla
+          <span class="cur"><i id="curTileSw"></i><span id="curTileNm">—</span></span></summary>
+          <div id="hotbar" title="1–9/0: terrenos · P: props"></div>
+        </details>
         <select id="propSel" onchange="selTerrain(this.value)" title="furniture / cover" style="display:none;max-width:110px">
           <option value="p-crate">Cajas</option><option value="p-barrel">Barril</option>
           <option value="p-table">Mesa</option><option value="p-chair">Silla</option>
@@ -391,15 +467,13 @@
         <input type="color" id="penColor" title="your pen color" style="display:none;width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none">
         <span class="muted" id="edgehint" style="display:none">L: wall → door · R: remove</span>
         <span id="seltools" style="display:none;gap:3px;align-items:center">
-          <button class="xs" id="sel-rect" onclick="setSelShape('rect')" title="rectangle selection">▭</button>
-          <button class="xs" id="sel-circle" onclick="setSelShape('circle')" title="circle / ellipse selection — drag from the centre">◯</button>
-          <button class="xs" id="sel-lasso" onclick="setSelShape('lasso')" title="freehand lasso selection">✎</button>
+          <span class="muted" style="font-size:11px">relleno:</span>
+          <span id="shapebar" style="display:flex;gap:3px"></span>
           <span class="mtsep"></span>
-          <button class="xs" onclick="fillSelection()" title="fill the selection with the active block (Enter)">▩ fill</button>
-          <button class="xs" onclick="eraseSelection()" title="clear the cells in the selection (Del)">⌫ erase</button>
-          <button class="xs" onclick="clearSelection()" title="deselect (Esc)">✕</button>
+          <button class="xs primary" onclick="roomFromSelection()" title="convierte la zona dibujada en una pieza (Enter)">⬚ agregar pieza</button>
+          <button class="xs" onclick="eraseSelection()" title="borra el terreno de la zona (Supr)">⌫ borrar</button>
+          <button class="xs" onclick="clearSelection()" title="soltar la zona (Esc)">✕</button>
           <span class="muted" id="selcount" style="font-size:11px"></span>
-          <span class="muted" style="font-size:11px">L: select+fill · R: select+erase · Shift: add · Alt: subtract</span>
         </span>
         <span id="fogtools" style="display:none;gap:3px">
           <button class="xs" onclick="dispatch({kind:'fogall',val:0})" title="cover the whole floor">⬛ cover</button>
@@ -420,7 +494,23 @@
         <button class="expand l gmonly sm" onclick="expandGrid('left')">◀ double</button>
         <button class="expand r gmonly sm" onclick="expandGrid('right')">▶ double</button>
       </div>
-      <div id="initpanel">
+      <!-- Una sola columna con pestañas en vez de tres paneles fijos: entre iniciativa
+           y aspects ya se iban 440px de ancho, y las piezas necesitaban sitio propio. -->
+      <div id="sidecol">
+        <div id="sidetabs">
+          <button data-sp="rooms"   class="on" onclick="setSidePanel('rooms')">Piezas</button>
+          <button data-sp="init"    onclick="setSidePanel('init')">Iniciativa</button>
+          <button data-sp="aspects" onclick="setSidePanel('aspects')">Aspects</button>
+        </div>
+      <div id="roompanel" class="sidepane">
+        <div class="hd">Piezas del mapa
+          <button class="xs primary gmonly" onclick="roomFromSelection()" title="convierte la zona dibujada en una pieza">+ agregar pieza</button></div>
+        <div id="roomlist"></div>
+        <div id="roomdetail"></div>
+        <div class="muted" style="font-size:10px;padding:6px;border-top:1px solid var(--line)">
+          Dibuja una zona con <b>Dibujo</b> (tecla <b>D</b>) y pulsa <b>+ agregar pieza</b>. La zona recién dibujada queda marcada.</div>
+      </div>
+      <div id="initpanel" class="sidepane" style="display:none">
         <div class="hd">Initiative <span class="tag" id="roundTag">Round 1</span>
           <span><button class="xs primary gmonly" onclick="nextTurn()" title="finish this turn — spotlight the next (new round when it wraps)">▶ next</button>
           <button class="xs gmonly" onclick="initImportParty()" title="add all PCs">+PCs</button>
@@ -430,12 +520,13 @@
         <div class="muted" style="font-size:10px;padding:6px;border-top:1px solid var(--line)">
           <span class="hb">Homebrew helper</span> — Daggerheart is spotlight-based (no fixed initiative RAW). Use this only if your table likes turn order.</div>
       </div>
-      <div id="aspectpanel">
+      <div id="aspectpanel" class="sidepane" style="display:none">
         <div class="hd">Aspects
           <button class="xs primary" onclick="addAspectFromPanel()" title="cualquiera puede añadir un aspect a la escena">+ aspect</button></div>
         <div id="aspectlist"></div>
         <div class="muted" style="font-size:10px;padding:6px;border-top:1px solid var(--line)">
           Los ◈ del mapa los siembra el GM (ocultos). Aquí cualquiera añade aspects de escena, visibles al instante.</div>
+      </div>
       </div>
     </div>
   </div>
@@ -738,6 +829,11 @@ let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strok
 let ME={ id:null, name:'', isHost:false, role:'player', peer:null, socket:null, sock:null };
 let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=null, stepQueue=[], stepCtx=null, npcEditId=null, activeTab=null;
 let selShape='rect', SEL=new Set(), selDrag=null;   // area-selection state (see AREA SELECTION below)
+/* Leer localStorage aquí tiene que ir protegido: en modo privado o con las cookies
+   bloqueadas lanza, y al estar en el cuerpo del script tumbaría la carga entera —
+   nada por debajo llegaría a inicializarse. */
+let selRoom=null, mapSkin='paper';
+try{ mapSkin=lsGet('ph-map-skin')||'paper'; }catch(e){}
 
 function rid(n){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 
@@ -798,32 +894,48 @@ async function openCampaignFile(){
     if(!d||d.type!=='pulpheart-campaign'||!d.state){alert('No es un archivo de campaña válido.');return;}
     const cmp={id:d.id||rid(8),name:d.name||'Campaña',code:String(d.code||rid(6)).toUpperCase(),created:Date.now(),lastPlayed:Date.now()};
     campTouch(cmp);
-    try{localStorage.setItem('ph-camp-'+cmp.id,JSON.stringify({v:1,saved:d.saved,state:d.state}));}catch(e){}
+    try{lsSet('ph-camp-'+cmp.id,JSON.stringify({v:1,saved:d.saved,state:d.state}));}catch(e){}
     await fsPut(cmp.id,h);
     renderCampaigns();
     flash('Campaña cargada desde archivo. Entra como GM cuando quieras.');
   }catch(e){}
 }
-const PH_BUILD='b27';
+/* ---- almacenamiento a prueba de bloqueos ----
+   Si el navegador tiene el almacenamiento de sitio bloqueado (cookies bloqueadas,
+   ciertos modos privados, algunas políticas para file://), `localStorage` no devuelve
+   null: LANZA. Y como la primera lectura ocurre en boot(), eso mataba la carga entera
+   y dejaba sólo la cabecera en pantalla, sin pestañas ni nada — sin ningún error
+   visible para el usuario.
+   Ahora todo pasa por aquí: si no hay almacenamiento, el VTT funciona igual pero sin
+   guardar, y lo dice en vez de morir en silencio. */
+let LS_OK=true;
+try{ const k='__ph_test'; localStorage.setItem(k,'1'); localStorage.removeItem(k); }
+catch(e){ LS_OK=false; }
+function lsGet(k){ if(!LS_OK)return null; try{ return localStorage.getItem(k); }catch(e){ LS_OK=false; return null; } }
+function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){ LS_OK=false; return false; } }
+function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
+const PH_BUILD='v7.9';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
-  const h=(localStorage.getItem('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  const h=(lsGet('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
   return h?('wss://'+h):'';
 }
 function relayHttp(){
-  const h=(localStorage.getItem('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
+  const h=(lsGet('ph-relay-host')||'').trim().replace(/^wss?:\/\//,'').replace(/^https?:\/\//,'').replace(/\/+$/,'');
   return h?('https://'+h):'';
 }
 function cfgRelayHost(){
-  const cur=localStorage.getItem('ph-relay-host')||'';
-  const v=prompt('Servidor de conexión (te lo da tu GM).\nEjemplo: pulp-heart.onrender.com  (sin https://)\nTODOS en la mesa deben usar el mismo.',cur);
+  const cur=lsGet('ph-relay-host')||'';
+  const v=askText('Servidor de conexión (te lo da tu GM).\nEjemplo: pulp-heart.onrender.com  (sin https://)\nTODOS en la mesa deben usar el mismo.',cur);
   if(v===null)return;
-  if(v.trim())localStorage.setItem('ph-relay-host',v.trim());
-  else localStorage.removeItem('ph-relay-host');
+  if(v.trim())lsSet('ph-relay-host',v.trim());
+  else lsDel('ph-relay-host');
   relayWarnUpdate();
-  if(v.trim()&&confirm('Guardado.\n\nHay que recargar la página para aplicarlo. ¿Recargar ahora?'))location.reload();
-  else flash('Guardado — recarga la página para aplicarlo.');
+  /* Recarga directa: con confirm() bloqueado el ajuste quedaba guardado pero sin aplicar
+     y sin que nadie te dijera por qué. */
+  if(v.trim()){ flash('Servidor guardado — recargando…'); setTimeout(()=>location.reload(),700); }
+  else flash('Servidor borrado — recarga la página para aplicarlo.');
 }
 /* Muestra u oculta el aviso de "falta configurar". Se llama al abrir el modal y
    después de configurar, para que desaparezca en el acto y no haya que adivinar
@@ -867,51 +979,95 @@ function openRelaySocket(url,{onopen,onmessage,onclose,onfail,maxTries=3}={}){
 })();
 const LSC='ph-campaigns';
 let CAMP=null;
-function campIndex(){try{return JSON.parse(localStorage.getItem(LSC))||[]}catch(e){return[]}}
-function campIndexSave(l){try{localStorage.setItem(LSC,JSON.stringify(l))}catch(e){}}
+function campIndex(){try{return JSON.parse(lsGet(LSC))||[]}catch(e){return[]}}
+function campIndexSave(l){try{lsSet(LSC,JSON.stringify(l))}catch(e){}}
 function campTouch(meta){const l=campIndex();const i=l.findIndex(x=>x.id===meta.id);
   if(i>-1)l[i]=Object.assign({},l[i],meta); else l.push(meta);
   l.sort((a,b)=>(b.lastPlayed||0)-(a.lastPlayed||0)); campIndexSave(l);}
 function campSave(){ if(!CAMP)return;
   const now=Date.now(); if(now-(campSave.__t||0)<1500)return; campSave.__t=now;
-  try{localStorage.setItem('ph-camp-'+CAMP.id,JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE}));}catch(e){}
+  try{lsSet('ph-camp-'+CAMP.id,JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE}));}catch(e){}
   campTouch({id:CAMP.id,name:STATE.campName||CAMP.name,code:CAMP.code,lastPlayed:now});
   campFileWrite();}
-function campLoadState(id){try{const d=JSON.parse(localStorage.getItem('ph-camp-'+id));return (d&&d.state)||null}catch(e){return null}}
+function campLoadState(id){try{const d=JSON.parse(lsGet('ph-camp-'+id));return (d&&d.state)||null}catch(e){return null}}
 function saveName(){const n=(document.getElementById('m-name').value||'').trim();
-  if(n)try{localStorage.setItem('ph-name',n)}catch(e){} return n;}
+  if(n)try{lsSet('ph-name',n)}catch(e){} return n;}
 function renderCampaigns(){
   const box=document.getElementById('campList'); if(!box)return;
   const l=campIndex();
   box.innerHTML=l.length?'':'<p class="muted" style="font-size:12px">Sin campañas todavía. Crea una o únete con el código que te pase el GM.</p>';
   l.forEach(cmp=>{
     const d=document.createElement('div'); d.className='initrow';
-    d.innerHTML='<div style="flex:1"><b></b> <span class="muted" style="font-size:11px">'+cmp.code+'</span></div>'
+    d.innerHTML='<div style="flex:1;display:flex;align-items:center;gap:6px">'
+      +'<input class="campname" value="" title="Renombrar campaña">'
+      +'<span class="muted" style="font-size:11px;white-space:nowrap">'+cmp.code+'</span></div>'
       +'<button class="xs primary" data-a="gm">GM</button>'
       +'<button class="xs" data-a="pl">Jugador</button>'
       +(FSOK?'<button class="xs" data-a="fs" title="vincular archivo de guardado automático">🗎</button>':'')
       +'<button class="xs danger" data-a="del" title="olvidar en este equipo">✕</button>';
-    d.querySelector('b').textContent=cmp.name||'Campaña';
+    const nm=d.querySelector('.campname');
+    nm.value=cmp.name||'Campaña';
+    nm.onchange=()=>campRename(cmp.id,nm.value.trim());
+    nm.onkeydown=e=>{ if(e.key==='Enter')nm.blur(); };
     d.querySelector('[data-a=gm]').onclick=()=>enterCampaign(cmp,'gm');
     const fsb=d.querySelector('[data-a=fs]');
     if(fsb){fsb.onclick=()=>campLinkFile(cmp);
       fsGet(cmp.id).then(h=>{if(h)fsb.style.color='var(--gold)';});}
     d.querySelector('[data-a=pl]').onclick=()=>enterCampaign(cmp,'player');
     d.querySelector('[data-a=del]').onclick=()=>{
-      if(confirm('¿Olvidar "'+(cmp.name||'')+'" en ESTE equipo? No afecta a los demás.')){
+      if(okDouble('camp'+cmp.id,'Olvidar «'+(cmp.name||'')+'» en ESTE equipo. No afecta a los demás.')){
         campIndexSave(campIndex().filter(x=>x.id!==cmp.id));
-        try{localStorage.removeItem('ph-camp-'+cmp.id)}catch(e){}
+        try{lsDel('ph-camp-'+cmp.id)}catch(e){}
         renderCampaigns();}};
     box.appendChild(d);
   });
 }
+/* Sin prompt(): si el navegador tiene los diálogos bloqueados, prompt() devuelve null
+   y la campaña no se creaba, sin aviso ninguno — el botón parecía muerto. Se crea con
+   un nombre por defecto y se renombra en la propia lista. */
 function newCampaign(){
-  const n=saveName(); if(!n){setStatus('Pon tu nombre primero.');return;}
-  const name=prompt('Nombre de la campaña:'); if(!name)return;
-  const cmp={id:rid(8),name:name.slice(0,40),code:rid(6).toUpperCase(),created:Date.now(),lastPlayed:Date.now()};
+  const n=saveName();
+  if(!n){ setStatus('⚠ Escribe tu nombre arriba antes de crear la campaña.');
+    const f=document.getElementById('m-name');
+    if(f){ f.classList.add('needfill'); f.focus();
+      setTimeout(()=>f.classList.remove('needfill'),2500); }
+    return; }
+  const name='Campaña '+(campIndex().length+1);
+  const cmp={id:rid(8),name,code:rid(6).toUpperCase(),created:Date.now(),lastPlayed:Date.now()};
   campTouch(cmp);
-  STATE.campName=name.slice(0,40);
+  STATE.campName=name;
   enterCampaign(cmp,'gm',true);
+}
+/* Renombrar desde la lista, sin diálogos. */
+function campRename(id,v){
+  const l=campIndex(); const c=l.find(x=>x.id===id); if(!c)return;
+  c.name=(v||'Campaña').slice(0,40); campIndexSave(l);
+  if(CAMP&&CAMP.id===id){CAMP.name=c.name; STATE.campName=c.name;}
+  renderCampaigns();
+}
+/* Confirmación de dos toques, síncrona y sin depender del navegador. Sustituye a
+   confirm(): cuando los diálogos están bloqueados confirm() devuelve false, así que el
+   botón simplemente no hacía nada. Aquí el primer toque arma y avisa, el segundo ejecuta. */
+let CONF_ARM=null,CONF_T=null;
+function okDouble(key,msg){
+  if(CONF_ARM===key){ clearTimeout(CONF_T); CONF_ARM=null; return true; }
+  CONF_ARM=key; clearTimeout(CONF_T);
+  CONF_T=setTimeout(()=>{CONF_ARM=null;},5000);
+  const m='⚠ '+msg+'  ·  Pulsa otra vez para confirmar.';
+  flash(m); setStatus(m);   /* el toast dura poco y algunos botones viven en el modal */
+  return false;
+}
+/* Envoltorio de prompt() que no falla en silencio: si el navegador tiene los diálogos
+   bloqueados devuelve null igual que si cancelaras, y sin esto el usuario no tiene
+   forma de distinguirlo. */
+function askText(msg,def){
+  let v=null;
+  try{ v=prompt(msg,def===undefined?'':def); }catch(e){ v=null; }
+  if(v===null&&!askText.__warned){
+    askText.__warned=true;
+    flash('Si no apareció ningún cuadro de texto, este navegador tiene bloqueados los diálogos de la página. Búscalo en el candado de la barra de direcciones.');
+  }
+  return v;
 }
 function joinNewCampaign(){
   const n=saveName(); if(!n){setStatus('Pon tu nombre primero.');return;}
@@ -930,7 +1086,7 @@ async function enterCampaign(cmp,seat,fresh){
       const fd=await campFileRead(cmp);          // linked file, if any
       if(fd&&fd.state){
         const fN=Date.parse(fd.saved||0)||0;
-        let lN=0; try{const l=JSON.parse(localStorage.getItem('ph-camp-'+cmp.id)); lN=Date.parse((l&&l.saved)||0)||0;}catch(e){}
+        let lN=0; try{const l=JSON.parse(lsGet('ph-camp-'+cmp.id)); lN=Date.parse((l&&l.saved)||0)||0;}catch(e){}
         if(!st||fN>=lN)st=fd.state;              // file wins if newer (or no browser copy)
       }
     }
@@ -1092,14 +1248,19 @@ function playerReceive(d){ if(d.t==='state'){ STATE=d.state;
 } }
 function activeFloorId(){return ((STATE.floors||[])[STATE.floorIdx||0]||{}).id||'fl0';}
 function relinkFloor(){const f=(STATE.floors||[])[STATE.floorIdx]; if(!f)return;
-  f.grid=STATE.grid; f.tiles=STATE.tiles; f.edges=STATE.edges; f.strokes=STATE.strokes||[]; f.fog=STATE.fog||(STATE.fog={}); f.aspects=STATE.aspects||(STATE.aspects=[]);}
+  f.grid=STATE.grid; f.tiles=STATE.tiles; f.edges=STATE.edges; f.strokes=STATE.strokes||[]; f.fog=STATE.fog||(STATE.fog={}); f.aspects=STATE.aspects||(STATE.aspects=[]);
+  f.rooms=STATE.rooms||(STATE.rooms=[]);}
 function normalizeFloors(){
   if(!STATE.floors||!STATE.floors.length){
     STATE.fog=STATE.fog||{};
     STATE.aspects=STATE.aspects||[];
-    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects}];
+    STATE.rooms=STATE.rooms||[];
+    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects,rooms:STATE.rooms}];
     STATE.floorIdx=0;
   }
+  // mapas guardados antes de v7 no traen rooms — dárselo aquí evita comprobarlo en cada uso
+  (STATE.floors||[]).forEach(f=>{ if(!f.rooms)f.rooms=[]; });
+  if(!STATE.rooms)STATE.rooms=[];
   if(STATE.floorIdx==null||STATE.floorIdx<0||STATE.floorIdx>=STATE.floors.length)STATE.floorIdx=0;
   relinkFloor();
   const fid=activeFloorId();
@@ -1109,8 +1270,9 @@ function switchFloorLocal(i){
   if(!STATE.floors||!STATE.floors[i])return;
   relinkFloor();
   STATE.floorIdx=i; const f=STATE.floors[i];
-  f.grid=f.grid||{cols:24,rows:16,cell:30,scale:5}; f.tiles=f.tiles||{}; f.edges=f.edges||{}; f.strokes=f.strokes||[]; f.fog=f.fog||{}; f.aspects=f.aspects||[];
-  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects;
+  f.grid=f.grid||{cols:24,rows:16,cell:30,scale:5}; f.tiles=f.tiles||{}; f.edges=f.edges||{}; f.strokes=f.strokes||[]; f.fog=f.fog||{}; f.aspects=f.aspects||[]; f.rooms=f.rooms||[];
+  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects; STATE.rooms=f.rooms;
+  selRoom=null;
 }
 function renderFloorUI(){
   const sel=document.getElementById('floorSel'); if(!sel||!STATE.floors)return;
@@ -1120,10 +1282,10 @@ function renderFloorUI(){
   sel.disabled=!(ME.isHost||!ME.peer);
 }
 function gmSwitchFloor(i){ if(!(ME.isHost||!ME.peer)){renderFloorUI();return;} dispatch({kind:'floorswitch',idx:i}); }
-function addFloor(){ const n=prompt('Floor name?','Piso '+((STATE.floors||[]).length+1)); if(n===null)return; dispatch({kind:'flooradd',name:n,id:rid(4)}); }
-function renameFloor(){ const f=STATE.floors[STATE.floorIdx]; const n=prompt('Rename floor:',f.name||''); if(n===null)return; dispatch({kind:'floorrename',idx:STATE.floorIdx,name:n}); }
+function addFloor(){ const n=askText('Floor name?','Piso '+((STATE.floors||[]).length+1)); if(n===null)return; dispatch({kind:'flooradd',name:n,id:rid(4)}); }
+function renameFloor(){ const f=STATE.floors[STATE.floorIdx]; const n=askText('Rename floor:',f.name||''); if(n===null)return; dispatch({kind:'floorrename',idx:STATE.floorIdx,name:n}); }
 function delFloor(){ if((STATE.floors||[]).length<2){alert('At least one floor is required.');return;}
-  if(!confirm('Delete floor "'+(STATE.floors[STATE.floorIdx].name||'')+'" and its tokens?'))return;
+  if(!okDouble('floordel'+STATE.floorIdx,'Borrar el piso "'+(STATE.floors[STATE.floorIdx].name||'')+'" y sus fichas.'))return;
   dispatch({kind:'floordel',idx:STATE.floorIdx}); }
 function renderAspects(){
   const layer=document.getElementById('aspects'); if(!layer)return;
@@ -1145,7 +1307,7 @@ function renderAspects(){
       flash(na.revealed?'Aspect revelado':'Aspect oculto');};
     el.oncontextmenu=(e)=>{e.preventDefault();e.stopPropagation();
       if(!gm)return;
-      if(confirm('\u00bfBorrar aspect: "'+a.text+'"?'))dispatch({kind:'aspectdel',id:a.id});};
+      if(okDouble('asp'+a.id,'Borrar aspect: '+a.text))dispatch({kind:'aspectdel',id:a.id});};
     layer.appendChild(el);
   });
 }
@@ -1172,13 +1334,13 @@ function renderAspectPanel(gm,fog){
       dispatch({kind:'aspectset',a:na});
       if(na.revealed)log(null,'ASPECT',a.text,true);};
     const del=row.querySelector('.del');
-    if(del)del.onclick=()=>{ if(confirm('¿Borrar aspect: "'+a.text+'"?'))dispatch({kind:'aspectdel',id:a.id});};
+    if(del)del.onclick=()=>{ if(okDouble('asp'+a.id,'Borrar aspect: '+a.text))dispatch({kind:'aspectdel',id:a.id});};
     box.appendChild(row);
   });
   if(!box.childElementCount)box.innerHTML='<div class="muted" style="font-size:11px">— sin aspects en este piso —</div>';
 }
 function addAspectFromPanel(){
-  const text=prompt('Nuevo aspect de escena (visible para todos):'); if(!text)return;
+  const text=askText('Nuevo aspect de escena (visible para todos):'); if(!text)return;
   const a={id:rid(4),r:null,c:null,text:text.slice(0,200),revealed:true,owner:ME.id};
   dispatch({kind:'aspectset',a});
   log(null,'ASPECT',a.text,true);
@@ -1188,7 +1350,7 @@ function setupAspects(){
   g.addEventListener('pointerdown',e=>{
     if(mapMode!=='aspect'||e.button!==0||!(ME.isHost||!ME.peer))return;
     const t=e.target; if(!t.classList.contains('cell'))return;
-    const text=prompt('Texto del aspect (los jugadores lo ven al revelarlo):'); if(!text)return;
+    const text=askText('Texto del aspect (los jugadores lo ven al revelarlo):'); if(!text)return;
     dispatch({kind:'aspectset',a:{id:rid(4),r:+t.dataset.r,c:+t.dataset.c,text:text.slice(0,200),revealed:false,owner:ME.id}});
   });
 }
@@ -1301,6 +1463,14 @@ function apply(a){
     case 'aspectset':{ STATE.aspects=STATE.aspects||[]; const i=STATE.aspects.findIndex(x=>x.id===a.a.id);
       if(i>-1)STATE.aspects[i]=a.a; else STATE.aspects.push(a.a); relinkFloor(); break;}
     case 'aspectdel': STATE.aspects=(STATE.aspects||[]).filter(x=>x.id!==a.id); relinkFloor(); break;
+    /* ---- piezas (v7) ---- */
+    case 'roomset':{ STATE.rooms=STATE.rooms||[]; const i=STATE.rooms.findIndex(x=>x.id===a.room.id);
+      if(i>-1)STATE.rooms[i]=a.room; else STATE.rooms.push(a.room); relinkFloor(); break;}
+    case 'roomdel': STATE.rooms=(STATE.rooms||[]).filter(x=>x.id!==a.id); relinkFloor(); break;
+    case 'roomvis':{ const r=(STATE.rooms||[]).find(x=>x.id===a.id); if(r)r.visible=!!a.val; break;}
+    case 'roomreveal':{ const r=(STATE.rooms||[]).find(x=>x.id===a.id);
+      if(r&&r.secret&&r.secret.length){ r.secret.forEach(k=>{ if(!r.revealed)r.revealed=[];
+        if(!r.revealed.includes(k))r.revealed.push(k); }); } break;}
     case 'paint': a.cells.forEach(({r,c,id})=>{const k=r+','+c; if(id==='erase')delete STATE.tiles[k]; else STATE.tiles[k]=id;}); break;
     case 'cleartiles': STATE.tiles={}; break;
     case 'clearmap':{ STATE.tiles={}; STATE.edges={}; STATE.strokes=[]; STATE.fog={};
@@ -1310,7 +1480,10 @@ function apply(a){
     case 'addtoken': if(!a.token.floor)a.token.floor=activeFloorId(); STATE.tokens.push(a.token); break;
     case 'stroke': (STATE.strokes||(STATE.strokes=[])).push(a.stroke); if(STATE.strokes.length>500)STATE.strokes.shift(); break;
     case 'delstroke': STATE.strokes=(STATE.strokes||[]).filter(s=>s.id!==a.id); break;
-    case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;} break;}
+    case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;
+      /* Vía 1 de las tres acordadas: pasar al lado revela la puerta secreta. Sólo lo
+         evalúa el GM, que es quien tiene el estado bueno, y se difunde a la mesa. */
+      if(ME.isHost||!ME.peer)setTimeout(()=>roomProximityReveal(a.r,a.c),0);} break;}
     case 'deltoken': STATE.tokens=STATE.tokens.filter(t=>t.id!==a.id); break;
     case 'upchar':{const isNew=!STATE.characters[a.char.id];
       if(isNew&&a.char.owner&&a.char.owner!==ME.id&&Object.values(STATE.characters).some(c=>c.owner===a.char.owner))break;
@@ -1554,11 +1727,11 @@ function renderOneSheet(ch){
         ${equipmentSection(ch,ed)}
         ${featureCards(ch)}
         <div class="row" style="justify-content:space-between;align-items:center;margin-top:4px">
-          <h3 style="color:var(--gold);margin:0">Domain Cards — Loadout <span class="muted" style="font-size:12px">(${ch.loadout.length}/${LOADOUT_MAX})</span></h3>
+          <h3 style="color:var(--gold);margin:0">Domain Cards — Loadout <span class="muted" style="font-size:12px">(${(ch.loadout||[]).length}/${LOADOUT_MAX})</span></h3>
           <span>${ed&&cls?`<button class="sm" onclick="openCardPicker('${ch.id}','loadout')">+ add card</button>`:''} <button class="sm" onclick="openVault('${ch.id}')">🗃 Vault (${ch.vault.length})</button></span>
         </div>
-        <div class="cardgrid">${ch.loadout.map(k=>domainCardHTML(findCard(k),ch,ed,'loadout')).join('')}</div>
-        ${ch.loadout.length===0?`<p class="muted" style="font-size:12px;margin:0">No domain cards yet.${cls?'':' Choose a class first.'}</p>`:''}
+        <div class="cardgrid">${(ch.loadout||[]).map(k=>domainCardHTML(findCard(k),ch,ed,'loadout')).join('')}</div>
+        ${(ch.loadout||[]).length===0?`<p class="muted" style="font-size:12px;margin:0">No domain cards yet.${cls?'':' Choose a class first.'}</p>`:''}
       </section>
 
     </div>
@@ -1629,12 +1802,12 @@ function unequip(id,slot){const ch=copyChar(id);
   if(slot.startsWith('gear:')){const i=+slot.split(':')[1]; ch.gear.splice(i,1);} else ch[slot]=null;
   dispatch({kind:'upchar',char:ch});}
 function customItem(id){
-  const name=prompt('Custom item name:'); if(!name)return;
-  const ev=+prompt('Evasion modifier (number, 0 if none):','0')||0;
-  const maj=+prompt('Major threshold modifier:','0')||0;
-  const sev=+prompt('Severe threshold modifier:','0')||0;
-  const score=+prompt('Armor score modifier:','0')||0;
-  const text=prompt('Description (optional):','')||'';
+  const name=askText('Custom item name:'); if(!name)return;
+  const ev=+askText('Evasion modifier (number, 0 if none):','0')||0;
+  const maj=+askText('Major threshold modifier:','0')||0;
+  const sev=+askText('Severe threshold modifier:','0')||0;
+  const score=+askText('Armor score modifier:','0')||0;
+  const text=askText('Description (optional):','')||'';
   const ch=copyChar(id); ch.gear=ch.gear||[]; ch.gear.push({name,category:'Custom',text,evasionMod:ev,majorMod:maj,severeMod:sev,scoreMod:score});
   dispatch({kind:'upchar',char:ch});
 }
@@ -1936,7 +2109,7 @@ function setClass(id,val){const ch=copyChar(id); ch.cls=val; ch.subclass=''; dis
 function newChar(){
   if(!ME.isHost&&Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release or delete your current character first.');return;}
   openCreator();}
-function delChar(id){if(confirm('Delete this character?'))dispatch({kind:'delchar',id});}
+function delChar(id){if(okDouble('char'+id,'Borrar este personaje.'))dispatch({kind:'delchar',id});}
 /* ---- character portrait ----
    The image lives on the character as a data URI, which means it rides along in every
    P2P state broadcast and in the campaign autosave. So it is ALWAYS downscaled and
@@ -2167,20 +2340,64 @@ function pickCardWork(idx){const c=window.__pickerW.pool[idx]; const key=cardKey
 
 /* ================= MAP ================= */
 let mapZoom=1;
-const HOTBAR=[].concat(TERRAIN.filter(t=>!t.prop).map(t=>({type:'terrain',id:t.id,title:(t.id==='water'?'Water':t.id==='rough'?'Difficult terrain':'Elevation '+t.label+' ft')})),[
-  {type:'mode',mode:'edges',icon:'\u25a6',title:'Walls / Doors \u2014 L: wall\u2192door, R: remove'},
-  {type:'mode',mode:'draw',icon:'\u270e',title:'Pen \u2014 draw freehand; R-click a stroke to erase it'},
-  {type:'mode',mode:'off',icon:'\u270b',title:'View / move only'},
-  {type:'props',icon:'\u25a3',title:'Props / furniture \u2014 pick one from the list'},
-  {type:'mode',mode:'fog',icon:'\u2593',title:'Fog of war (GM) \u2014 L: reveal, R: hide, Shift+L: toggle room',gm:true},
-  {type:'mode',mode:'aspect',icon:'\u25c8',title:'Aspects (GM) \u2014 L en celda: crear; L en pin: revelar/ocultar; R en pin: borrar',gm:true},
-  {type:'mode',mode:'select',icon:'\u2b1a',title:'Area select (GM) \u2014 rectangle / circle / lasso; fills many cells at once',gm:true}]);
-const HOTKEYS=['1','2','3','4','5','6','7','8','9','0','p','f','a','s'];
-function setMapMode(m){mapMode=m; const eh=document.getElementById('edgehint'); if(eh)eh.style.display=m==='edges'?'':'none'; const ft=document.getElementById('fogtools'); if(ft)ft.style.display=(m==='fog')?'inline-flex':'none'; const pc=document.getElementById('penColor'); if(pc)pc.style.display=(m==='draw')?'':'none';
-  const st=document.getElementById('seltools'); if(st)st.style.display=(m==='select')?'inline-flex':'none';
-  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',m==='select');
-  if(m!=='select')clearSelection(true);
+/* El desplegable \u00abTipo de casilla\u00bb s\u00f3lo lleva lo que se PINTA: terrenos y props.
+   Las herramientas que no dibujan terreno (l\u00e1piz, muros, niebla, aspects, piezas)
+   salieron a botones propios en la barra \u2014 mezclarlas obligaba a abrir la paleta
+   para cambiar de herramienta. */
+const HOTBAR=[].concat(TERRAIN.filter(t=>!t.prop).map(t=>({type:'terrain',id:t.id,title:(t.id==='water'?'Agua':t.id==='rough'?'Terreno dif\u00edcil':'Elevaci\u00f3n '+t.label+' ft')})),[
+  {type:'props',icon:'\u25a3',title:'Props / mobiliario \u2014 elige uno de la lista'}]);
+const HOTKEYS=['1','2','3','4','5','6','7','8','9','0'];
+/* Una sola herramienta para el mapa: Dibujo. Dentro se elige CON QU\u00c9 FORMA se rellena
+   y CON QU\u00c9 CASILLA. Lo dibujado queda seleccionado, as\u00ed que "agregar pieza" convierte
+   la zona reci\u00e9n hecha sin volver a marcarla.
+   Antes esto eran tres modos separados (terreno / relleno / piezas) y obligaba a
+   repetir la misma selecci\u00f3n en cada uno. */
+const MODEBAR=[
+  {mode:'paint', icon:'\u25a8', label:'Dibujo',  key:'d', title:'Dibujar el mapa \u2014 elige con qu\u00e9 rellenas y con qu\u00e9 casilla'},
+  {mode:'fog',   icon:'\u2593', label:'Niebla',  key:'f', title:'Niebla de guerra (GM)', gm:true},
+  {mode:'draw',  icon:'\u270e', label:'L\u00e1piz',   key:'l', title:'Trazo libre a mano alzada \u2014 clic der. sobre un trazo lo borra'},
+  {mode:'aspect',icon:'\u25c8', label:'Aspects', key:'a', title:'Aspects (GM)', gm:true},
+  {mode:'off',   icon:'\u270b', label:'Ver',     key:'v', title:'S\u00f3lo ver y mover fichas'}
+];
+/* Formas de relleno dentro de Dibujo. \u00ablibre\u00bb es el pintado casilla a casilla de
+   siempre; las dem\u00e1s marcan una regi\u00f3n de una pasada. */
+const SHAPES=[
+  {id:'free',  icon:'\u270f', title:'Libre \u2014 pinta casilla a casilla arrastrando'},
+  {id:'rect',  icon:'\u25ad', title:'Rect\u00e1ngulo \u2014 arrastra de esquina a esquina'},
+  {id:'circle',icon:'\u25ef', title:'C\u00edrculo \u2014 arrastra desde el centro'},
+  {id:'lasso', icon:'\u25cc', title:'Lazo \u2014 dibuja el contorno a mano alzada'},
+  /* Muros vive aqu\u00ed y no como herramienta aparte: tambi\u00e9n es dibujar el mapa, s\u00f3lo
+     que sobre los bordes de la casilla en vez de sobre la casilla. */
+  {id:'walls', icon:'\u25a6', title:'Muros y puertas \u2014 clic izq: muro\u2192puerta, der: quitar', edges:true}
+];
+/* Cada herramienta muestra SÓLO sus propios controles y esconde los demás: el
+   desplegable de terreno aparece (y se abre) al entrar en Terreno y desaparece al
+   salir; las formas rect/círculo/lazo salen tanto en Relleno como en Piezas, porque
+   en las dos se marca un área. */
+/* Dibujo agrupa el pintado de casillas Y los muros: por dentro son dos modos
+   ('paint' y 'edges') pero para el usuario es una sola herramienta. */
+function isDrawTool(m){return m==='paint'||m==='edges';}
+function setMapMode(m){
+  const eraDibujo=isDrawTool(mapMode);
+  mapMode=m;
+  // al entrar en Dibujo desde fuera, arrancar con la última forma que no sea muros
+  if(m==='paint'&&!eraDibujo&&SHAPES.find(s=>s.id===selShape&&s.edges))selShape='rect';
+  const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
+  const dib=isDrawTool(m);
+  show('edgehint', m==='edges');
+  show('fogtools', m==='fog','inline-flex');
+  show('penColor', m==='draw');
+  show('seltools', dib,'inline-flex');
+  show('tilewrap', m==='paint');
+  const tw=document.getElementById('tilewrap'); if(tw&&m==='paint')tw.open=true;
+  const ps=document.getElementById('propSel'); if(ps&&m!=='paint')ps.style.display='none';
+  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',m==='paint'&&selShape!=='free');
+  if(!dib)clearSelection(true);
   buildPalette(); renderMap();}
+function buildShapeBar(){
+  const bar=document.getElementById('shapebar'); if(!bar)return;
+  bar.innerHTML=SHAPES.map(s=>`<button class="xs${s.id===selShape?' on':''}" title="${s.title}" onclick="setSelShape('${s.id}')">${s.icon}</button>`).join('');
+}
 function buildPalette(){
   const bar=document.getElementById('hotbar'); if(!bar)return;
   if(!bar.childElementCount){
@@ -2189,20 +2406,41 @@ function buildPalette(){
       return '<div class="hslot'+(sl.gm?' gmonly':'')+'" data-i="'+i+'" title="'+sl.title+' ['+(HOTKEYS[i]||'')+']" onclick="pickSlot('+i+')">'+inner+'<span class="k">'+(HOTKEYS[i]||'')+'</span></div>';
     }).join('');
   }
-  const paintish=(mapMode==='paint'||mapMode==='select');
-  const isProp=paintish&&TERRAIN_MAP[selectedTerrain]&&TERRAIN_MAP[selectedTerrain].prop;
-  const sel=HOTBAR.findIndex(sl=>sl.type==='terrain'?(mapMode==='paint'&&selectedTerrain===sl.id):sl.type==='props'?(mapMode==='paint'&&isProp):(sl.mode===mapMode||(sl.mode==='draw'&&mapMode==='erase-stroke')));
+  const isProp=TERRAIN_MAP[selectedTerrain]&&TERRAIN_MAP[selectedTerrain].prop;
+  const sel=HOTBAR.findIndex(sl=>sl.type==='terrain'?(selectedTerrain===sl.id):(sl.type==='props'&&isProp));
   const ps=document.getElementById('propSel'); if(ps)ps.style.display=isProp?'':'none';
-  bar.querySelectorAll('.hslot').forEach(el=>{el.classList.toggle('sel',+el.dataset.i===sel); if(el.classList.contains('gmonly'))el.style.display=(ME.isHost||!ME.peer)?'flex':'none';});
+  bar.querySelectorAll('.hslot').forEach(el=>{el.classList.toggle('sel',+el.dataset.i===sel);});
+  /* Resumen en la cabecera del desplegable: qué terreno tienes activo sin abrirlo,
+     que es el punto de tenerlo plegado. */
+  const sw=document.getElementById('curTileSw'), nmEl=document.getElementById('curTileNm');
+  if(sw&&nmEl){
+    const t=TERRAIN_MAP[selectedTerrain]||{};
+    sw.style.background=t.color||'var(--line)'; sw.style.display='';
+    nmEl.textContent = isProp ? (t.label||'Prop')
+      : (selectedTerrain==='water'?'Agua':selectedTerrain==='rough'?'Difícil':'Elevación '+(t.label||''));
+  }
+  buildModeBar(); buildShapeBar();
 }
+/* Barra de herramientas: separada del desplegable de terreno a propósito. */
+function buildModeBar(){
+  const bar=document.getElementById('modebar'); if(!bar)return;
+  const gm=(ME.isHost||!ME.peer);
+  bar.innerHTML=MODEBAR.filter(m=>!m.gm||gm).map(m=>{
+    const on=(m.mode==='paint'?isDrawTool(mapMode):m.mode===mapMode)||(m.mode==='draw'&&mapMode==='erase-stroke');
+    return `<button class="mbtn${on?' on':''}" title="${m.title} [${m.key}]" onclick="setMapMode('${m.mode}')">
+      <span class="ic">${m.icon}</span><span class="lb">${m.label}</span></button>`;}).join('');
+}
+/* Elegir un terreno ya no cambia de herramienta: sólo dice CON QUÉ pintas. Antes
+   saltaba a modo pintar, lo que hacía imposible elegir el terreno estando en otra
+   herramienta (p.ej. para rellenar una selección). */
 function pickSlot(i){const sl=HOTBAR[i]; if(!sl)return;
-  if(sl.type==='props'){const ps=document.getElementById('propSel'); selectedTerrain=(ps&&ps.value)||'p-crate';
-    if(mapMode==='select'){buildPalette(); if(SEL.size)fillSelection(); return;}
-    if(mapMode!=='paint'){setMapMode('paint');return;} buildPalette(); return;}
-  if(sl.type==='terrain'){selectedTerrain=sl.id;
-    if(mapMode==='select'){buildPalette(); if(SEL.size)fillSelection(); return;}
-    if(mapMode!=='paint'){setMapMode('paint');return;} buildPalette();} else setMapMode(sl.mode);}
-function selTerrain(v){selectedTerrain=v; buildPalette(); if(mapMode==='select'&&SEL.size)fillSelection();}
+  if(sl.type==='props'){const ps=document.getElementById('propSel'); selectedTerrain=(ps&&ps.value)||'p-crate';}
+  else if(sl.type==='terrain'){selectedTerrain=sl.id;}
+  buildPalette();
+  // con una zona ya marcada, cambiar de casilla la repinta al instante
+  if(mapMode==='paint'&&SEL.size)fillSelection();
+  else if(mapMode!=='paint')setMapMode('paint');}
+function selTerrain(v){selectedTerrain=v; buildPalette(); if(mapMode==='paint'&&SEL.size)fillSelection();}
 function updateMapSizer(){const sz=document.getElementById('mapsizer'); if(!sz)return; const g=STATE.grid; sz.style.width=(g.cols*g.cell*mapZoom+72)+'px'; sz.style.height=(g.rows*g.cell*mapZoom+72)+'px';}
 function setZoom(z,ev){
   z=Math.max(0.35,Math.min(3,Math.round(z*100)/100));
@@ -2239,24 +2477,76 @@ function setupMapNav(){
       const dy=e.key==='ArrowDown'?st:e.key==='ArrowUp'?-st:0;
       wrap.scrollLeft+=dx; wrap.scrollTop+=dy;
       return;}
-    if(mapMode==='select'){
+    if(mapMode==='paint'&&SEL.size){
       if(e.key==='Escape'){clearSelection(); e.preventDefault(); return;}
-      if(e.key==='Enter'){fillSelection(); e.preventDefault(); return;}
+      if(e.key==='Enter'){roomFromSelection(); e.preventDefault(); return;}   // la zona dibujada → pieza
       if(e.key==='Delete'||e.key==='Backspace'){eraseSelection(); e.preventDefault(); return;}
     }
-    const i=HOTKEYS.indexOf(e.key); if(i>-1&&i<HOTBAR.length){pickSlot(i); e.preventDefault();}
+    const i=HOTKEYS.indexOf(e.key); if(i>-1&&i<HOTBAR.length){pickSlot(i); e.preventDefault(); return;}
+    const md=MODEBAR.find(m=>m.key===e.key.toLowerCase());
+    if(md&&(!md.gm||ME.isHost||!ME.peer)){setMapMode(md.mode); e.preventDefault();}
   });
   document.addEventListener('keyup',e=>{if(e.key===' '){space=false; wrap.classList.remove('spacepan');}});
 }
-function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); }
+function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); applyMapSkin(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); renderRooms(); }
+/* En un mapa a tinta la elevación no se distingue por color sino por TRAMA, que es
+   como se hace a mano: lo hundido se oscurece, lo elevado se raya. Sin esto todos los
+   suelos salían del mismo blanco y no se diferenciaba nada. */
+const PAPER_TILE={
+  'e-2':'background:#cdc4b1;background-image:repeating-linear-gradient(45deg,rgba(60,50,38,.30) 0 1px,transparent 1px 4px),repeating-linear-gradient(-45deg,rgba(60,50,38,.30) 0 1px,transparent 1px 4px);',
+  'e-1':'background:#e0d8c6;background-image:repeating-linear-gradient(45deg,rgba(60,50,38,.22) 0 1px,transparent 1px 6px);',
+  'e0' :'background:#f6f1e6;',
+  'e1' :'background:#f6f1e6;background-image:repeating-linear-gradient(90deg,rgba(60,50,38,.20) 0 1px,transparent 1px 7px);',
+  'e2' :'background:#f6f1e6;background-image:repeating-linear-gradient(90deg,rgba(60,50,38,.28) 0 1px,transparent 1px 4px),repeating-linear-gradient(0deg,rgba(60,50,38,.18) 0 1px,transparent 1px 8px);',
+  'water':'background:#c3d6e4;background-image:repeating-linear-gradient(0deg,rgba(40,80,115,.35) 0 1px,transparent 1px 6px);',
+  'rough':'background:#e8dfc9;background-image:radial-gradient(rgba(70,58,40,.55) 1.1px,transparent 1.2px);background-size:7px 7px;'
+};
+function paperStyle(id){
+  if(PAPER_TILE[id])return PAPER_TILE[id];
+  const t=TERRAIN_MAP[id];
+  // props: fondo de suelo normal — el glifo encima ya los identifica
+  return t&&t.prop ? 'background:#f6f1e6;' : 'background:#f6f1e6;';
+}
 function renderGrid(){
   const g=document.getElementById('grid'); if(!g)return; const {cols,rows,cell}=STATE.grid;
   g.style.gridTemplateColumns=`repeat(${cols},${cell}px)`; g.style.gridTemplateRows=`repeat(${rows},${cell}px)`;
   g.style.width=(cols*cell)+'px'; g.style.height=(rows*cell)+'px'; updateMapSizer();
   ['edges','edgehot','ink','aspects','tokens','selov','fogcv'].forEach(idn=>{const e=document.getElementById(idn); if(e){e.style.width=(cols*cell)+'px'; e.style.height=(rows*cell)+'px';}});
-  let html=''; for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const id=STATE.tiles[r+','+c]; const gly=PROP_GLYPH[id]||'';
-    html+=`<div class="cell" data-r="${r}" data-c="${c}" style="${id?terrainStyle(id):''}${gly?';display:flex;align-items:center;justify-content:center;line-height:1;font-size:'+Math.round(cell*0.62)+'px':''}">${gly}</div>`;}
+  const paper=(mapSkin==='paper'), gm=(ME.isHost||!ME.peer);
+  const T=STATE.tiles;
+  let html='';
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const k=r+','+c;
+    let id=T[k];
+    /* Regla acordada: una pieza apagada oculta TODO lo suyo. Para el jugador la celda
+       simplemente no existe — ni terreno, ni prop, ni el hueco en la roca. */
+    const hidden=id&&cellHiddenByRoom(r,c);
+    if(hidden)id=null;
+    const gly=(id&&PROP_GLYPH[id])||'';
+    let st='';
+    if(paper){
+      /* Contorno del sólido: se traza tinta en cada lado donde el suelo toca la roca,
+         haya o no un muro declarado. Sin esto una caverna se lee como manchas sueltas
+         en vez de como un hueco excavado — es lo que hace que parezca dibujada a mano.
+         Sale de los datos que ya existen: no hay que marcar nada a mano. */
+      const solid=(rr,cc)=>{ const kk=rr+','+cc;
+        return !!T[kk] && !(T[kk]&&cellHiddenByRoom(rr,cc)); };
+      if(id){
+        const bw='4px solid #1a1714', bn='0';
+        st=paperStyle(id)
+          +'border-top:'+(solid(r-1,c)?bn:bw)+';border-bottom:'+(solid(r+1,c)?bn:bw)
+          +';border-left:'+(solid(r,c-1)?bn:bw)+';border-right:'+(solid(r,c+1)?bn:bw)+';';
+      }else{
+        st='background:transparent;border:0;';   // roca: la textura la pone #grid
+      }
+    }else if(id){ st=terrainStyle(id); }
+    if(gly)st+=';display:flex;align-items:center;justify-content:center;line-height:1;color:'+(paper?'#2a2622':'inherit')+';font-size:'+Math.round(cell*0.62)+'px';
+    html+=`<div class="cell${paper&&!id?' rock':''}" data-r="${r}" data-c="${c}" style="${st}">${gly}</div>`;
+  }
   g.innerHTML=html;
+  /* La pieza seleccionada se marca como un área translúcida en la capa de overlay
+     (ver renderSelectionOnly), no con un recuadro por celda: aquello se leía como una
+     rejilla gruesa encima del mapa y competía con el dibujo. */
   const sc=document.getElementById('scaleSel'); if(sc)sc.value=String(STATE.grid.scale||5);
 }
 function renderEdges(){
@@ -2290,6 +2580,10 @@ function renderTokens(){
     }
     const __mine=t.owner===ME.id||(t.charId&&STATE.characters[t.charId]&&STATE.characters[t.charId].owner===ME.id);
     if(!__gm&&!__mine&&STATE.fog&&!STATE.fog[t.r+','+t.c])return;
+    /* Pieza apagada = oculta también a quien esté dentro. Se mira dónde está el token
+       ahora, no dónde lo pusiste: si no, un enemigo que sale persiguiendo a alguien se
+       volvería invisible al cruzar la puerta. Tu propio personaje siempre se ve. */
+    if(!__gm&&!__mine&&cellHiddenByRoom(t.r,t.c))return;
     const el=document.createElement('div'); el.className='token'; el.textContent=t.label||'';
     el.style.width=el.style.height=(cell-4)+'px'; el.style.left=(t.c*cell+2)+'px'; el.style.top=(t.r*cell+2)+'px'; el.style.background=t.color||'#b5443b'; el.dataset.id=t.id;
     el.title='double-click: range rings';
@@ -2356,7 +2650,7 @@ function renderStrokes(){
 function setupInk(){
   const layer=document.getElementById('ink'); if(!layer)return;
   const pc=document.getElementById('penColor');
-  if(pc){pc.value=localStorage.getItem('hh-pen-color')||'#ffd24a'; pc.oninput=()=>localStorage.setItem('hh-pen-color',pc.value);}
+  if(pc){pc.value=lsGet('hh-pen-color')||'#ffd24a'; pc.oninput=()=>lsSet('hh-pen-color',pc.value);}
   let drawing=null, temp=null;
   function toCell(ev){const r=document.getElementById('grid').getBoundingClientRect(); const {cols,rows,cell}=STATE.grid;
     let x=(ev.clientX-r.left)/(cell*mapZoom), y=(ev.clientY-r.top)/(cell*mapZoom);
@@ -2385,15 +2679,22 @@ function setupInk(){
 }
 function setupPaint(){
   const g=document.getElementById('grid'); let batch=[], eraseDrag=false;
-  function paintCell(target){ if(mapMode!=='paint'||!(ME.isHost||!ME.peer)||!target.classList.contains('cell'))return; const r=+target.dataset.r,c=+target.dataset.c;
+  /* Sólo con la forma «libre»; las demás las lleva setupSelect. */
+  const freeMode=()=>mapMode==='paint'&&selShape==='free'&&(ME.isHost||!ME.peer);
+  function paintCell(target){ if(!freeMode()||!target.classList.contains('cell'))return; const r=+target.dataset.r,c=+target.dataset.c;
     const id=eraseDrag?'erase':selectedTerrain;
     target.style.cssText=(id==='erase'?'':terrainStyle(id)); batch.push({r,c,id});}
-  g.addEventListener('pointerdown',e=>{if(mapMode!=='paint'||(e.button!==0&&e.button!==2))return; eraseDrag=(e.button===2); painting=true; batch=[]; paintCell(e.target);});
+  g.addEventListener('pointerdown',e=>{if(!freeMode()||(e.button!==0&&e.button!==2))return; eraseDrag=(e.button===2); painting=true; batch=[]; SEL.clear(); paintCell(e.target);});
   g.addEventListener('pointerover',e=>{if(painting)paintCell(e.target);});
   g.addEventListener('contextmenu',e=>e.preventDefault());
-  window.addEventListener('pointerup',()=>{if(painting){painting=false; eraseDrag=false; if(batch.length)dispatch({kind:'paint',cells:batch}); batch=[];}});
+  window.addEventListener('pointerup',()=>{if(painting){painting=false;
+    /* Lo pintado a mano también queda seleccionado, para que «agregar pieza» valga
+       igual que con las formas — si no, la forma libre sería la única sin ese camino. */
+    if(!eraseDrag)batch.forEach(({r,c})=>SEL.add(r+','+c));
+    eraseDrag=false; if(batch.length)dispatch({kind:'paint',cells:batch}); batch=[];
+    updateSelCount(); renderSelection();}});
 }
-function clearTiles(){if(confirm('Clear the entire map — terrain, walls, drawings, and tokens?'))dispatch({kind:'clearmap'});}
+function clearTiles(){if(okDouble('clearmap','Borrar TODO el mapa: terreno, muros, dibujos y fichas.'))dispatch({kind:'clearmap'});}
 function expandGrid(side){
   const g=JSON.parse(JSON.stringify(STATE.grid)); let tiles={},edges={},tokens=JSON.parse(JSON.stringify(STATE.tokens));
   const oldC=g.cols, oldR=g.rows; let dC=0,dR=0;
@@ -2458,12 +2759,12 @@ function renderInit(){
      +'</div></div>';
   }).join('')||'<p class="muted" style="font-size:12px;padding:6px">Empty. Add PCs or NPCs.</p>';
 }
-function initAddRow(){const n=prompt('Name:'); if(!n)return; dispatch({kind:'initiative',list:[...STATE.initiative,{id:rid(4),name:n,note:''}]});}
+function initAddRow(){const n=askText('Name:'); if(!n)return; dispatch({kind:'initiative',list:[...STATE.initiative,{id:rid(4),name:n,note:''}]});}
 function initImportParty(){const rows=Object.values(STATE.characters).filter(c=>c.owner!=='gm'&&!STATE.initiative.some(x=>x.refId===c.id)).map(c=>({id:rid(4),refId:c.id,name:c.name,note:'PC'})); dispatch({kind:'initiative',list:[...STATE.initiative,...rows]});}
 function initEdit(id,f,v){dispatch({kind:'initiative',list:STATE.initiative.map(x=>x.id===id?{...x,[f]:v}:x)});}
 function initToggle(id){dispatch({kind:'initiative',list:STATE.initiative.map(x=>({...x,act:x.id===id?!x.act:false}))});}
 function initDel(id){dispatch({kind:'initiative',list:STATE.initiative.filter(x=>x.id!==id)});}
-function initClear(){if(confirm('Clear initiative and reset the round counter?')){dispatch({kind:'initiative',list:[]}); dispatch({kind:'initround',n:1});}}
+function initClear(){if(okDouble('initclr','Vaciar la iniciativa y reiniciar la ronda.')){dispatch({kind:'initiative',list:[]}); dispatch({kind:'initround',n:1});}}
 function initMove(id,dir){const l=[...STATE.initiative]; const i=l.findIndex(x=>x.id===id); const j=i+dir; if(j<0||j>=l.length)return; [l[i],l[j]]=[l[j],l[i]]; dispatch({kind:'initiative',list:l});}
 
 /* ================= NPC LIBRARY + ENCOUNTER ================= */
@@ -2517,7 +2818,7 @@ function npcClearForm(){['nc-name','nc-dmg','nc-motives','nc-feat'].forEach(i=>{
 function npcEdit(id){const n=STATE.npcLibrary.find(x=>x.id===id); if(!n)return; npcEditId=id;
   setVal('nc-name',n.name);setVal('nc-type',n.type);setVal('nc-tier',n.tier);setVal('nc-diff',n.diff);setVal('nc-hp',n.hp);setVal('nc-stress',n.stress);setVal('nc-atk',n.atk);setVal('nc-dmg',n.dmg);setVal('nc-range',n.range);setVal('nc-major',n.major);setVal('nc-severe',n.severe);setVal('nc-motives',n.motives);setVal('nc-feat',n.features);
   document.getElementById('nc-editing').textContent='editing '+n.name;}
-function npcDel(id){if(confirm('Delete from library?'))dispatch({kind:'npclib',list:STATE.npcLibrary.filter(n=>n.id!==id)});}
+function npcDel(id){if(okDouble('npc'+id,'Borrar de la biblioteca.'))dispatch({kind:'npclib',list:STATE.npcLibrary.filter(n=>n.id!==id)});}
 function npcToEncounter(id){const n=STATE.npcLibrary.find(x=>x.id===id); if(!n)return;
   const inst={...n,iid:rid(5),hpmax:n.hp,hp:0,stressmax:n.stress,stressNow:0};
   dispatch({kind:'encounter',list:[...STATE.encounter,inst]}); flash(n.name+' added to active NPCs');}
@@ -2575,7 +2876,7 @@ function renderCountdowns(){const box=document.getElementById('cdlist'); if(!box
       <button class="xs danger" onclick="cdDel('${c.id}')">✕</button></div>
       <div class="cdpips">${pips}</div></div>`;}).join('')||'<p class="muted" style="font-size:12px">No countdowns. Add one to track a looming threat or objective.</p>';
 }
-function cdAdd(){const name=prompt('Countdown name (e.g. "Ritual completes"):'); if(!name)return; const max=+prompt('Number of segments:','4')||4; dispatch({kind:'countdowns',list:[...STATE.countdowns,{id:rid(4),name,value:0,max}]});}
+function cdAdd(){const name=askText('Countdown name (e.g. "Ritual completes"):'); if(!name)return; const max=+askText('Number of segments:','4')||4; dispatch({kind:'countdowns',list:[...STATE.countdowns,{id:rid(4),name,value:0,max}]});}
 function cdEdit(id,f,v){dispatch({kind:'countdowns',list:STATE.countdowns.map(c=>c.id===id?{...c,[f]:v}:c)});}
 function cdStep(id,d){dispatch({kind:'countdowns',list:STATE.countdowns.map(c=>c.id===id?{...c,value:Math.max(0,Math.min(c.max,c.value+d))}:c)});}
 function cdSet(id,i){dispatch({kind:'countdowns',list:STATE.countdowns.map(c=>c.id===id?{...c,value:(c.value===i?i-1:i)}:c)});}
@@ -2805,7 +3106,7 @@ function renderQuickActions(){
   box.innerHTML=h||'<p class="muted" style="font-size:12px">Equip weapons or items, or take domain cards with dice in their text — quick-roll buttons appear here automatically.</p>';
 }
 
-function rollPlain(){const spec=prompt('Dice (e.g. 2d6+1, d20):','d12'); if(!spec)return;
+function rollPlain(){const spec=askText('Dice (e.g. 2d6+1, d20):','d12'); if(!spec)return;
   const m=spec.replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i); if(!m){alert('format like 2d6+1');return;}
   const n=+(m[1]||1),sides=+m[2],mod=+(m[3]||0); let rolls=[],sum=mod; for(let i=0;i<n;i++){const x=rollDie(sides);rolls.push(x);sum+=x;}
   dispatch({kind:'log',entry:{id:rid(6),who:ME.name,text:`rolls ${spec} → [${rolls.join(', ')}]${mod?(mod>0?'+'+mod:mod):''} = ${sum}`}});}
@@ -3043,14 +3344,14 @@ function aiContext(){
   s+='\nSRD CATALOG (name (tier/type)): '+ADV.map(a=>a.name+' ('+a.tier+'/'+a.type+')').join('; ');
   return s;
 }
-function aiSaveKey(){localStorage.setItem('hh-api-key',val('ai-key')); flash('Key saved (this browser only)');}
-function aiInit(){const k=localStorage.getItem('hh-api-key'); if(k)setVal('ai-key',k);}
+function aiSaveKey(){lsSet('hh-api-key',val('ai-key')); flash('Key saved (this browser only)');}
+function aiInit(){const k=lsGet('hh-api-key'); if(k)setVal('ai-key',k);}
 function aiMsg(role,html){const lg=document.getElementById('ai-log'); if(!lg)return null;
   const div=document.createElement('div'); div.className='card'; if(role==='user')div.style.borderColor='var(--gold)';
   div.innerHTML='<div class="muted" style="font-size:11px">'+(role==='user'?'GM':'Assistant')+'</div>'+html;
   lg.appendChild(div); lg.scrollTop=lg.scrollHeight; return div;}
 async function aiSend(){
-  const key=val('ai-key')||localStorage.getItem('hh-api-key');
+  const key=val('ai-key')||lsGet('hh-api-key');
   if(!key){flash('Paste your Anthropic API key first (console.anthropic.com).');return;}
   const text=val('ai-in').trim(); if(!text)return; setVal('ai-in','');
   aiMsg('user',esc(text).replace(/\n/g,'<br>'));
@@ -3305,7 +3606,7 @@ function renderEnvFeats(){const box=document.getElementById('envList'); if(!box)
    +'<button class="xs danger" onclick="envDel(\''+f.id+'\')">✕</button></span></div>'
    +'<div style="font-size:12px;white-space:pre-wrap;margin-top:3px">'+esc(f.text)+'</div></div>').join('')
    ||'<p class="muted" style="font-size:12px">No environment features yet. Add one manually or describe your setting and ask the Assistant.</p>';}
-function envAdd(){const name=prompt('Feature name:'); if(!name)return; const cost=Math.max(0,+prompt('Fear cost:','1')||0); const text=prompt('Effect (what happens when you spend the Fear):')||'';
+function envAdd(){const name=askText('Feature name:'); if(!name)return; const cost=Math.max(0,+askText('Fear cost:','1')||0); const text=askText('Effect (what happens when you spend the Fear):')||'';
   dispatch({kind:'envfeat',list:[...(STATE.envFeatures||[]),{id:rid(4),name,cost,text}]});}
 function envDel(id){dispatch({kind:'envfeat',list:(STATE.envFeatures||[]).filter(f=>f.id!==id)});}
 function envUse(id){const f=(STATE.envFeatures||[]).find(x=>x.id===id); if(!f)return;
@@ -3425,7 +3726,7 @@ function loadSession(){
 }
 /* ---- map-only export / import (dungeon files) ---- */
 function saveMap(){
-  const name=prompt('Map name?','map')||'map';
+  const name=askText('Map name?','map')||'map';
   normalizeFloors();
   const data=JSON.stringify({v:2,type:'hellheart-map',name,saved:new Date().toISOString(),
     floors:STATE.floors,floorIdx:STATE.floorIdx,
@@ -3488,16 +3789,16 @@ function loadMap(){
     rd.onload=()=>{try{
       const data=JSON.parse(rd.result);
       if(data&&Array.isArray(data.floors)){
-        if(!confirm('Load multi-floor map? This replaces ALL floors (character tokens are kept).'))return;
+        if(!okDouble('loadmf','Cargar mapa multi-piso: reemplaza TODOS los pisos (las fichas de personaje se mantienen).'))return;
         applyFloorsFile(data); return;
       }
       if(data&&data.state&&Array.isArray(data.state.floors)){
-        if(!confirm('Load multi-floor map from session file? This replaces ALL floors.'))return;
+        if(!okDouble('loadses','Cargar mapa desde archivo de sesión: reemplaza TODOS los pisos.'))return;
         applyFloorsFile({floors:data.state.floors,floorIdx:data.state.floorIdx,tokens:data.state.tokens}); return;
       }
       const d=data.state?{name:data.name,grid:data.state.grid,tiles:data.state.tiles,edges:data.state.edges,strokes:data.state.strokes}:data;
       const err=validateMapData(d); if(err){alert('Not a valid map file: '+err);return;}
-      if(Object.keys(STATE.tiles||{}).length&&!confirm('Replace the current map? Characters and existing tokens are kept.'))return;
+      if(Object.keys(STATE.tiles||{}).length&&!okDouble('loadmap','Reemplazar el mapa actual (personajes y fichas se mantienen).'))return;
       applyMapFile(d);
     }catch(e){alert('Could not read file: '+e.message);}};
     rd.readAsText(f);};
@@ -3505,15 +3806,286 @@ function loadMap(){
 }
 let __lastSave=0;
 function autosave(){campSave();}
-function releaseChar(id){if(!confirm('Release this character so another player can claim it?'))return;
+function releaseChar(id){if(!okDouble('rel'+id,'Liberar este personaje para que otro jugador lo tome.'))return;
   dispatch({kind:'releasechar',charId:id}); flash('Character released');}
-function claimChar(id){if(confirm('Claim this character as yours?'))dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name});}
+function claimChar(id){if(okDouble('clm'+id,'Tomar este personaje como tuyo.'))dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name});}
+
+/* ================= PIEZAS (v7) =================
+   Una pieza es una región del mapa convertida en objeto: celdas + enemigos + loot +
+   visibilidad + puertas secretas. Se dibuja con las mismas herramientas de selección
+   que ya existían (tecla S), así que crear una es "marca el área y púlsalo".
+   Vive por piso, junto a tiles/edges/fog/aspects. */
+const ROOM_COLORS=['#c8862e','#4a90c9','#5aa46a','#9a63d0','#c0524a','#3fb8a0','#c07fb0','#c9a227'];
+function roomsOf(){return STATE.rooms||(STATE.rooms=[]);}
+function roomById(id){return roomsOf().find(r=>r.id===id)||null;}
+/* qué pieza contiene una celda — usado por la niebla y por los tokens */
+function roomAt(r,c){const k=r+','+c; return roomsOf().find(rm=>rm.cells&&rm.cells.indexOf(k)>-1)||null;}
+/* Regla acordada: apagar una pieza oculta TODO lo suyo — terreno, enemigos y loot.
+   Se evalúa por dónde está el token AHORA, no por dónde nació: si no, un enemigo que
+   sale de una sala apagada persiguiendo a alguien se volvería invisible al cruzar. */
+function cellHiddenByRoom(r,c){
+  if(ME.isHost||!ME.peer)return false;          // el GM lo ve todo
+  const rm=roomAt(r,c); return !!(rm&&rm.visible===false);
+}
+/* Sin prompt() a propósito. Chrome ofrece "impedir que esta página cree diálogos
+   adicionales" tras varios seguidos, y si el usuario la marca el prompt devuelve null
+   en silencio: la pieza no se creaba y no aparecía ningún aviso — parecía que el botón
+   estaba muerto. Ahora se crea con un nombre por defecto y se renombra en el panel,
+   que además evita interrumpir con un modal. */
+function roomFromSelection(){
+  if(!(ME.isHost||!ME.peer)){flash('Solo el GM crea piezas.');return;}
+  if(!SEL.size){flash('No hay ninguna zona marcada — dibuja una primero.');return;}
+  const nm='Sala '+(roomsOf().length+1);
+  const room={id:'rm-'+rid(6), name:nm,
+    color:ROOM_COLORS[roomsOf().length%ROOM_COLORS.length],
+    /* foes/items son listas estructuradas (encuentro y botín), no texto libre:
+       se pasan a la iniciativa y al inventario del personaje. */
+    cells:[...SEL], visible:true, foes:[], items:[], note:'', secret:[], revealed:[]};
+  selRoom=room.id;                 // antes del dispatch: el render va dentro y ya la deja seleccionada
+  dispatch({kind:'roomset',room});
+  clearSelection(); renderRooms(); renderMap();
+  setSidePanel('rooms');                       // que se vea dónde apareció
+  flash('Pieza «'+room.name+'» creada con '+room.cells.length+' celdas — ponle nombre a la derecha');
+  // el nombre queda listo para escribir encima, sin modal de por medio
+  setTimeout(()=>{const i=document.querySelector('#roomdetail input');
+    if(i){try{i.focus();i.select();}catch(e){}}},30);
+}
+/* ---- enemigos y loot de una pieza ----
+   Se guardan como referencias al catálogo (nombre + cantidad), no como texto libre:
+   así el encuentro se puede mandar a los NPC activos y el loot se puede entregar a un
+   personaje sin que nadie vuelva a teclear nada.
+   Se guarda el NOMBRE y no el índice del catálogo porque el índice se mueve en cuanto
+   se añade o reordena un adversario, y los mapas guardados sobrevivirían mal. */
+function roomEnemies(r){return Array.isArray(r&&r.foes)?r.foes:[];}
+function roomLoot(r){return Array.isArray(r&&r.items)?r.items:[];}
+function advByName(n){return (typeof ADV!=='undefined'?ADV:[]).find(a=>a.name===n)||null;}
+function gearByName(kind,n){const src=kind==='armor'?(EQUIP.armor||[]):kind==='weapon'?(EQUIP.weapons||[]):(EQUIP.items||[]);
+  return src.find(e=>e.name===n)||null;}
+/* buscador reutilizable: lista filtrable dentro del panel, sin modal */
+function roomPickerOpen(id,what){ window.__roomPicker={id,what,q:''}; renderRoomDetail();
+  setTimeout(()=>{const i=document.getElementById('rpq'); if(i)i.focus();},20); }
+function roomPickerClose(){ window.__roomPicker=null; renderRoomDetail(); }
+function roomPickerQuery(v){ if(window.__roomPicker){window.__roomPicker.q=v; renderRoomPickerList();} }
+function roomPickerList(){
+  const P=window.__roomPicker; if(!P)return [];
+  const q=(P.q||'').toLowerCase();
+  if(P.what==='foe')
+    return (typeof ADV!=='undefined'?ADV:[]).filter(a=>!q||a.name.toLowerCase().includes(q)).slice(0,40)
+      .map(a=>({key:a.name,label:a.name,meta:'T'+(a.tier||'?')+' · '+(a.type||'')+' · HP '+(a.hp||'?')}));
+  const out=[];
+  [['weapon',EQUIP.weapons||[]],['armor',EQUIP.armor||[]],['item',EQUIP.items||[]]].forEach(([k,arr])=>
+    arr.forEach(e=>{ if(!q||e.name.toLowerCase().includes(q))
+      out.push({key:k+'|'+e.name,label:e.name,meta:(k==='weapon'?'Arma':k==='armor'?'Armadura':'Objeto')+(e.category?' · '+e.category:'')}); }));
+  return out.slice(0,40);
+}
+function roomPickerAdd(key){
+  const P=window.__roomPicker; if(!P)return;
+  const r=roomById(P.id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r));
+  if(P.what==='foe'){ copy.foes=roomEnemies(copy);
+    const ex=copy.foes.find(f=>f.name===key);
+    if(ex)ex.qty=(ex.qty||1)+1; else copy.foes.push({name:key,qty:1});
+  }else{ copy.items=roomLoot(copy);
+    const [k,n]=key.split('|');
+    if(!copy.items.some(i=>i.kind===k&&i.name===n))copy.items.push({kind:k,name:n});
+  }
+  dispatch({kind:'roomset',room:copy});
+}
+function roomFoeQty(id,name,d){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.foes=roomEnemies(copy);
+  const f=copy.foes.find(x=>x.name===name); if(!f)return;
+  f.qty=(f.qty||1)+d; if(f.qty<1)copy.foes=copy.foes.filter(x=>x.name!==name);
+  dispatch({kind:'roomset',room:copy}); }
+function roomLootDel(id,kind,name){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy.items=roomLoot(copy).filter(i=>!(i.kind===kind&&i.name===name));
+  dispatch({kind:'roomset',room:copy}); }
+/* Manda el encuentro completo a los NPC activos, respetando las cantidades. */
+function roomFoesToEncounter(id){
+  const r=roomById(id); if(!r)return;
+  const foes=roomEnemies(r); if(!foes.length){flash('Esta pieza no tiene enemigos.');return;}
+  let list=[...(STATE.encounter||[])], n=0;
+  foes.forEach(f=>{ const a=advByName(f.name);
+    if(!a){flash('No encuentro «'+f.name+'» en el catálogo.');return;}
+    const base=advToNpc(a);
+    for(let i=0;i<(f.qty||1);i++){
+      list.push({...base,id:rid(5),iid:rid(5),hpmax:base.hp,hp:0,stressmax:base.stress,stressNow:0}); n++; }
+  });
+  dispatch({kind:'encounter',list});
+  flash(n+' enemigo(s) de «'+r.name+'» añadidos a los NPC activos');
+}
+/* Entrega el loot al personaje elegido: va a su inventario, como cualquier objeto. */
+function roomLootTo(id,charId){
+  const r=roomById(id), ch=STATE.characters[charId];
+  if(!r||!ch){flash('Elige un personaje.');return;}
+  const loot=roomLoot(r); if(!loot.length){flash('Esta pieza no tiene loot.');return;}
+  const copy=copyChar(charId); copy.gear=copy.gear||[]; let n=0;
+  loot.forEach(i=>{ const e=gearByName(i.kind,i.name); if(!e)return;
+    copy.gear.push(JSON.parse(JSON.stringify(e))); n++; });
+  dispatch({kind:'upchar',char:copy});
+  flash(n+' objeto(s) entregados a '+(ch.name||'el personaje'));
+}
+function roomPick(id){ selRoom=(selRoom===id?null:id); window.__roomPicker=null; renderRooms(); renderMap(); }
+function roomToggleVis(id,ev){ if(ev)ev.stopPropagation();
+  const r=roomById(id); if(!r)return; dispatch({kind:'roomvis',id,val:!(r.visible!==false)}); }
+function roomEdit(id,field,val){ const r=roomById(id); if(!r)return;
+  const copy=JSON.parse(JSON.stringify(r)); copy[field]=val; dispatch({kind:'roomset',room:copy}); }
+/* Confirmación en dos toques dentro de la propia interfaz, sin confirm(): si el
+   navegador tiene los diálogos bloqueados, confirm() devuelve false y el borrado
+   fallaría en silencio igual que fallaba la creación. */
+let roomDelArm=null;
+function roomDel(id){ const r=roomById(id); if(!r)return;
+  if(roomDelArm!==id){ roomDelArm=id; renderRoomDetail();
+    setTimeout(()=>{ if(roomDelArm===id){roomDelArm=null; renderRoomDetail();} },4000);
+    return; }
+  roomDelArm=null;
+  dispatch({kind:'roomdel',id}); if(selRoom===id)selRoom=null;
+  flash('Pieza borrada — el terreno del mapa no se tocó'); }
+function roomAddSelCells(id){ const r=roomById(id); if(!r)return;
+  if(!SEL.size){flash('Marca un área primero.');return;}
+  const copy=JSON.parse(JSON.stringify(r));
+  const set=new Set(copy.cells||[]); SEL.forEach(k=>set.add(k)); copy.cells=[...set];
+  dispatch({kind:'roomset',room:copy}); clearSelection(); flash('Área añadida a «'+r.name+'»'); }
+/* Puertas secretas: los bordes marcados de la pieza. Se revelan por cualquiera de las
+   tres vías acordadas — proximidad, tirada, o que el GM las abra — y una vez reveladas
+   quedan así para toda la mesa. */
+function roomMarkSecret(id){ const r=roomById(id); if(!r)return;
+  if(!SEL.size){flash('Marca las celdas que tocan la puerta secreta y vuelve a pulsar.');return;}
+  const copy=JSON.parse(JSON.stringify(r));
+  const set=new Set(copy.secret||[]); SEL.forEach(k=>set.add(k)); copy.secret=[...set];
+  dispatch({kind:'roomset',room:copy}); clearSelection();
+  flash(copy.secret.length+' celda(s) marcadas como puerta secreta'); }
+function roomRevealSecret(id){ dispatch({kind:'roomreveal',id}); flash('Puerta secreta revelada a la mesa'); }
+function roomSecretHidden(rm,k){
+  if(!rm||!rm.secret||!rm.secret.length)return false;
+  if(ME.isHost||!ME.peer)return false;
+  return rm.secret.indexOf(k)>-1 && !(rm.revealed||[]).includes(k);
+}
+/* Revelado por proximidad: al mover un token de jugador, cualquier puerta secreta
+   adyacente se abre para todos. Es una de las tres vías acordadas. */
+function roomProximityReveal(tr,tc){
+  if(!(ME.isHost||!ME.peer))return;
+  roomsOf().forEach(rm=>{
+    if(!rm.secret||!rm.secret.length)return;
+    const pend=rm.secret.filter(k=>!(rm.revealed||[]).includes(k));
+    if(!pend.length)return;
+    const near=pend.some(k=>{const [r,c]=k.split(',').map(Number);
+      return Math.abs(r-tr)<=1&&Math.abs(c-tc)<=1;});
+    if(near)dispatch({kind:'roomreveal',id:rm.id});
+  });
+}
+function setSidePanel(which){
+  document.querySelectorAll('#sidetabs button').forEach(b=>b.classList.toggle('on',b.dataset.sp===which));
+  const map={rooms:'roompanel',init:'initpanel',aspects:'aspectpanel'};
+  Object.keys(map).forEach(k=>{const el=document.getElementById(map[k]); if(el)el.style.display=(k===which)?'flex':'none';});
+}
+function renderRooms(){
+  const list=document.getElementById('roomlist'); if(!list)return;
+  const gm=(ME.isHost||!ME.peer);
+  const rooms=roomsOf().filter(r=>gm||r.visible!==false);   // el jugador no sabe que existen las apagadas
+  list.innerHTML=rooms.length?rooms.map(r=>{
+    const n=(r.cells||[]).length, sec=(r.secret||[]).length;
+    return `<div class="rmrow${r.id===selRoom?' sel':''}${r.visible===false?' off':''}" onclick="roomPick('${r.id}')">
+      <span class="sw" style="background:${r.color||'#c8862e'}"></span>
+      <span style="min-width:0;flex:1">
+        <div class="nm">${esc(r.name||'Sala')}</div>
+        <div class="mt">${(()=>{const f=roomEnemies(r).reduce((s,x)=>s+(x.qty||1),0);
+          return f?'<i title="enemigos">☠ '+f+'</i>':'';})()}${roomLoot(r).length?'<i title="loot">◈ '+roomLoot(r).length+'</i>':''}${sec?'<i title="puertas secretas">⚿ '+sec+'</i>':''}<i>${n} celdas</i></div>
+      </span>
+      ${gm?`<span class="eye" title="visible para los jugadores" onclick="roomToggleVis('${r.id}',event)">${r.visible===false?'🚫':'👁'}</span>`:''}
+    </div>`;}).join(''):'<div class="muted" style="font-size:11px;padding:10px">— sin piezas en este piso —</div>';
+  renderRoomDetail();
+}
+function roomFoesHTML(r){
+  const foes=roomEnemies(r);
+  const P=window.__roomPicker;
+  return `<div class="fld"><label>Encuentro — ${foes.length?foes.reduce((s,f)=>s+(f.qty||1),0)+' enemigos':'vacío'}</label>
+    ${foes.map(f=>{const a=advByName(f.name);
+      return `<div class="rmitem"><span class="n">${esc(f.name)}</span>
+        <span class="mt">${a?('T'+(a.tier||'?')+' · HP '+(a.hp||'?')):'<span style="color:var(--crimson)">no está en el catálogo</span>'}</span>
+        <span class="qty"><button class="xs" onclick="roomFoeQty('${r.id}','${esc(f.name).replace(/'/g,"\\'")}',-1)">−</button>
+        <b>${f.qty||1}</b>
+        <button class="xs" onclick="roomFoeQty('${r.id}','${esc(f.name).replace(/'/g,"\\'")}',1)">+</button></span></div>`;}).join('')}
+    <div class="row" style="gap:4px;margin-top:4px">
+      <button class="xs" onclick="roomPickerOpen('${r.id}','foe')">+ añadir enemigo</button>
+      ${foes.length?`<button class="xs primary" onclick="roomFoesToEncounter('${r.id}')" title="crea las instancias en NPC activos">⚔ enviar al encuentro</button>`:''}
+    </div>
+    ${P&&P.id===r.id&&P.what==='foe'?roomPickerHTML():''}</div>`;
+}
+function roomLootHTML(r){
+  const loot=roomLoot(r), P=window.__roomPicker;
+  const chars=Object.values(STATE.characters||{}).filter(c=>c.id!=='gm');
+  return `<div class="fld"><label>Loot — ${loot.length?loot.length+' objeto(s)':'vacío'}</label>
+    ${loot.map(i=>`<div class="rmitem"><span class="n">${esc(i.name)}</span>
+      <span class="mt">${i.kind==='weapon'?'Arma':i.kind==='armor'?'Armadura':'Objeto'}</span>
+      <span class="qty"><button class="xs danger" onclick="roomLootDel('${r.id}','${i.kind}','${esc(i.name).replace(/'/g,"\\'")}')">✕</button></span></div>`).join('')}
+    <div class="row" style="gap:4px;margin-top:4px">
+      <button class="xs" onclick="roomPickerOpen('${r.id}','loot')">+ añadir objeto</button>
+      ${loot.length&&chars.length?`<select class="xs" id="lootTo" style="font-size:11px;max-width:110px">${chars.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+      <button class="xs primary" onclick="roomLootTo('${r.id}',document.getElementById('lootTo').value)" title="añade el loot al inventario del personaje">→ entregar</button>`:''}
+    </div>
+    ${P&&P.id===r.id&&P.what==='loot'?roomPickerHTML():''}</div>`;
+}
+function roomPickerHTML(){
+  return `<div class="rmpicker">
+    <input id="rpq" placeholder="buscar…" oninput="roomPickerQuery(this.value)" style="width:100%;font-size:11px">
+    <div id="rplist"></div>
+    <button class="xs" style="width:100%;margin-top:4px" onclick="roomPickerClose()">cerrar</button></div>`;
+}
+function renderRoomPickerList(){
+  const box=document.getElementById('rplist'); if(!box)return;
+  const list=roomPickerList();
+  box.innerHTML=list.length?list.map(o=>`<div class="rpitem" onclick="roomPickerAdd('${o.key.replace(/'/g,"\\'")}')">
+    <span class="n">${esc(o.label)}</span><span class="mt">${esc(o.meta)}</span></div>`).join('')
+    :'<div class="muted" style="font-size:11px;padding:6px">sin resultados</div>';
+}
+function renderRoomDetail(){
+  const box=document.getElementById('roomdetail'); if(!box)return;
+  const r=roomById(selRoom), gm=(ME.isHost||!ME.peer);
+  if(!r||!gm){box.innerHTML=''; return;}
+  const sec=(r.secret||[]).length, rev=(r.revealed||[]).length;
+  box.innerHTML=`
+    <div class="fld"><label>Nombre</label>
+      <input value="${esc(r.name||'')}" onchange="roomEdit('${r.id}','name',this.value)"></div>
+    ${roomFoesHTML(r)}
+    ${roomLootHTML(r)}
+    <div class="fld"><label>Nota del GM</label>
+      <textarea rows="2" onchange="roomEdit('${r.id}','note',this.value)">${esc(r.note||'')}</textarea></div>
+    <div class="fld"><label>Puertas secretas — ${sec?(rev+' de '+sec+' reveladas'):'ninguna'}</label>
+      <div class="row" style="gap:4px">
+        <button class="xs" onclick="roomMarkSecret('${r.id}')" title="marca la selección actual como puerta secreta">⚿ marcar selección</button>
+        ${sec>rev?`<button class="xs primary" onclick="roomRevealSecret('${r.id}')">revelar</button>`:''}
+      </div></div>
+    <div class="fld"><div class="row" style="gap:4px">
+      <button class="xs" onclick="roomAddSelCells('${r.id}')" title="añade la selección actual a esta pieza">+ ampliar</button>
+      <button class="xs danger" onclick="roomDel('${r.id}')">${roomDelArm===r.id?'⚠ pulsa otra vez para borrar':'borrar pieza'}</button>
+    </div></div>`;
+  renderRoomPickerList();     // el buscador se repinta con el panel
+}
+function toggleMapSkin(){
+  mapSkin=(mapSkin==='paper')?'dark':'paper';
+  try{lsSet('ph-map-skin',mapSkin);}catch(e){}
+  applyMapSkin(); renderMap();
+}
+function applyMapSkin(){
+  const w=document.getElementById('mapwrap'); if(w)w.classList.toggle('paper',mapSkin==='paper');
+  const b=document.getElementById('skinBtn'); if(b)b.textContent=(mapSkin==='paper')?'🗺 papel':'🌑 oscuro';
+}
 
 /* ================= AREA SELECTION (rect / circle / lasso) — top-down 2D =================
    State (selShape / SEL / selDrag) is declared with the other map globals near the top,
    so setMapMode() can safely clear a selection before this point in the script. */
-function setSelShape(s){ selShape=s;
-  ['rect','circle','lasso'].forEach(k=>{const b=document.getElementById('sel-'+k); if(b)b.classList.toggle('on',k===s);});
+function setSelShape(s){
+  selShape=s;
+  /* «muros» edita bordes, así que por dentro cambia el modo — pero para el usuario
+     sigue siendo Dibujo, y la barra lo refleja así. */
+  const sh=SHAPES.find(x=>x.id===s);
+  mapMode = sh&&sh.edges ? 'edges' : 'paint';
+  const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
+  show('edgehint', mapMode==='edges');
+  show('tilewrap', mapMode==='paint');          // con muros no se elige casilla
+  const mw=document.getElementById('mapwrap');
+  if(mw)mw.classList.toggle('selmode',mapMode==='paint'&&s!=='free');
+  buildShapeBar(); buildModeBar(); renderMap();
 }
 function selCanEdit(){return ME.isHost||!ME.peer;}
 function updateSelCount(){const el=document.getElementById('selcount');
@@ -3555,6 +4127,59 @@ function selCellsFor(d){
   return out;
 }
 
+/* Área translúcida de la pieza seleccionada, dibujada en el overlay. Va con el color
+   de la propia pieza (no un azul fijo) para no perder de vista cuál es cuál cuando hay
+   varias, pero con el mismo tratamiento de mancha suave que pediste. */
+function drawRoomFill(x,cell){
+  const rm=roomById(selRoom); if(!rm||!(rm.cells||[]).length)return;
+  if(!(ME.isHost||!ME.peer))return;
+  x.save();
+  x.fillStyle=hexRGBA(rm.color||'#c8862e',0.22);
+  rm.cells.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1]; x.fillRect(c*cell,r*cell,cell,cell);});
+  // contorno fino sólo en el borde exterior, para delimitar sin hacer rejilla
+  x.strokeStyle=hexRGBA(rm.color||'#c8862e',0.85); x.lineWidth=Math.max(1,1.5/mapZoom);
+  x.beginPath();
+  const has=k=>rm.cells.indexOf(k)>-1;
+  rm.cells.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1],X=c*cell,Y=r*cell;
+    if(!has((r-1)+','+c)){x.moveTo(X,Y);x.lineTo(X+cell,Y);}
+    if(!has((r+1)+','+c)){x.moveTo(X,Y+cell);x.lineTo(X+cell,Y+cell);}
+    if(!has(r+','+(c-1))){x.moveTo(X,Y);x.lineTo(X,Y+cell);}
+    if(!has(r+','+(c+1))){x.moveTo(X+cell,Y);x.lineTo(X+cell,Y+cell);}});
+  x.stroke(); x.restore();
+}
+/* Animación del borde de selección. El bucle sólo corre mientras hay algo marcado y
+   se apaga solo: no conviene dejar un rAF girando toda la sesión. */
+let selAnts=0, selAntsRAF=null;
+function startAnts(){
+  if(selAntsRAF)return;
+  const step=()=>{
+    if(!SEL.size){selAntsRAF=null; return;}
+    selAnts=(selAnts+0.35)%10;
+    selAntsRAF=requestAnimationFrame(step);
+    renderSelectionOnly();
+  };
+  selAntsRAF=requestAnimationFrame(step);
+}
+/* redibuja sólo la capa de selección, sin rehacer el mapa entero en cada cuadro */
+function renderSelectionOnly(){
+  const cv=document.getElementById('selov'); if(!cv)return;
+  const {cols,rows,cell}=STATE.grid, W=cols*cell, H=rows*cell;
+  const s=(window.devicePixelRatio||1)*Math.min(2,Math.max(1,mapZoom));
+  const x=cv.getContext('2d'); x.setTransform(s,0,0,s,0,0); x.clearRect(0,0,W,H);
+  drawRoomFill(x,cell);
+  if(!SEL.size)return;
+  x.fillStyle='rgba(90,170,255,.18)';
+  SEL.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1]; x.fillRect(c*cell,r*cell,cell,cell);});
+  x.strokeStyle='#4aa3ff'; x.lineWidth=Math.max(1.5,2/mapZoom);
+  x.setLineDash([6/mapZoom,4/mapZoom]); x.lineDashOffset=-selAnts;
+  x.beginPath();
+  SEL.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1], X=c*cell, Y=r*cell;
+    if(!SEL.has((r-1)+','+c)){x.moveTo(X,Y);x.lineTo(X+cell,Y);}
+    if(!SEL.has((r+1)+','+c)){x.moveTo(X,Y+cell);x.lineTo(X+cell,Y+cell);}
+    if(!SEL.has(r+','+(c-1))){x.moveTo(X,Y);x.lineTo(X,Y+cell);}
+    if(!SEL.has(r+','+(c+1))){x.moveTo(X+cell,Y);x.lineTo(X+cell,Y+cell);}});
+  x.stroke(); x.setLineDash([]); x.lineDashOffset=0;
+}
 /* ---- overlay drawing ---- */
 function renderSelection(){
   const cv=document.getElementById('selov'); if(!cv)return;
@@ -3564,17 +4189,25 @@ function renderSelection(){
   if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;}
   cv.style.width=W+'px'; cv.style.height=H+'px';
   const x=cv.getContext('2d'); x.setTransform(s,0,0,s,0,0); x.clearRect(0,0,W,H);
-  if(mapMode!=='select')return;
+  drawRoomFill(x,cell);
+  /* Se dibuja SIEMPRE que haya algo marcado. Antes esto comprobaba un modo que ya no
+     existe ('select'), así que la selección era invisible: no sabías si tenías algo
+     marcado ni por qué «agregar pieza» no hacía nada. */
   if(SEL.size){
-    x.fillStyle='rgba(255,210,74,.20)';
+    x.fillStyle='rgba(90,170,255,.18)';
     SEL.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1]; x.fillRect(c*cell,r*cell,cell,cell);});
-    x.strokeStyle='rgba(255,210,74,.95)'; x.lineWidth=Math.max(1,1.5/mapZoom); x.beginPath();
+    /* Borde azul de trazo animado ("hormigas"): sólo el contorno exterior, y el guion
+       se desplaza con selAnts para que se vea vivo. */
+    x.strokeStyle='#4aa3ff'; x.lineWidth=Math.max(1.5,2/mapZoom);
+    x.setLineDash([6/mapZoom,4/mapZoom]); x.lineDashOffset=-selAnts;
+    x.beginPath();
     SEL.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1], X=c*cell, Y=r*cell;
       if(!SEL.has((r-1)+','+c)){x.moveTo(X,Y);x.lineTo(X+cell,Y);}
       if(!SEL.has((r+1)+','+c)){x.moveTo(X,Y+cell);x.lineTo(X+cell,Y+cell);}
       if(!SEL.has(r+','+(c-1))){x.moveTo(X,Y);x.lineTo(X,Y+cell);}
       if(!SEL.has(r+','+(c+1))){x.moveTo(X+cell,Y);x.lineTo(X+cell,Y+cell);}});
-    x.stroke();
+    x.stroke(); x.setLineDash([]); x.lineDashOffset=0;
+    startAnts();
   }
   const d=selDrag; if(!d)return;
   x.save();
@@ -3612,7 +4245,7 @@ function setupSelect(){
   const pos=ev=>{const r=g.getBoundingClientRect(), u=STATE.grid.cell*mapZoom;
     return [(ev.clientX-r.left)/u,(ev.clientY-r.top)/u];};
   g.addEventListener('pointerdown',e=>{
-    if(mapMode!=='select'||!selCanEdit())return;
+    if(mapMode!=='paint'||selShape==='free'||!selCanEdit())return;
     if(e.button!==0&&e.button!==2)return;
     e.preventDefault(); e.stopPropagation();
     const p=pos(e);
@@ -3633,31 +4266,56 @@ function setupSelect(){
     if(!d.keep)SEL.clear();
     cells.forEach(rc=>{const k=rc[0]+','+rc[1]; if(d.mode==='sub')SEL.delete(k); else SEL.add(k);});
     updateSelCount(); renderSelection();
+    /* Se rellena y la zona SE QUEDA seleccionada: así "agregar pieza" opera sobre lo
+       que acabas de dibujar, sin obligarte a volver a marcarlo. */
     if(SEL.size&&!d.keep){ if(d.btn===2)eraseSelection(); else fillSelection(); }
   };
   g.addEventListener('pointerup',fin); g.addEventListener('pointercancel',fin);
 }
 
 function boot(){
-  ME.id='solo-'+rid(4); ME.name=localStorage.getItem('ph-name')||'You'; ME.isHost=true; ME.role='gm';
-  const nm=document.getElementById('m-name'); if(nm)nm.value=localStorage.getItem('ph-name')||'';
+  ME.id='solo-'+rid(4); ME.name=lsGet('ph-name')||'You'; ME.isHost=true; ME.role='gm';
+  const nm=document.getElementById('m-name'); if(nm)nm.value=lsGet('ph-name')||'';
   try{ // migrate the old single-session autosave into a campaign, once
-    const raw=localStorage.getItem('hellheart-session');
+    const raw=lsGet('hellheart-session');
     if(raw&&!campIndex().length){const d=JSON.parse(raw);
       if(d&&d.state&&d.state.characters&&Object.keys(d.state.characters).length){
         const cmp={id:rid(8),name:'Campaña migrada',code:rid(6).toUpperCase(),created:Date.now(),lastPlayed:Date.now()};
         campTouch(cmp);
-        localStorage.setItem('ph-camp-'+cmp.id,JSON.stringify({v:1,saved:d.saved,state:d.state}));
+        lsSet('ph-camp-'+cmp.id,JSON.stringify({v:1,saved:d.saved,state:d.state}));
       }
-      localStorage.removeItem('hellheart-session');
+      lsDel('hellheart-session');
     }
   }catch(e){}
   if(STATE.lastRoll)shownRoll=STATE.lastRoll.id;
   layout('player'); buildQuickDice(); aiInit();
+  const vt=document.getElementById('verTag'); if(vt)vt.textContent=PH_BUILD;
+  document.title='PulpHeart VTT '+PH_BUILD+' — paranormal bureau table';
   const bt=document.getElementById('buildTag'); if(bt)bt.textContent='· build '+PH_BUILD+' — todos deben tener el mismo build';
   renderCampaigns(); openConnect();
+  if(!LS_OK){
+    setStatus('⚠ Este navegador tiene bloqueado el almacenamiento del sitio: el VTT funciona, pero NO va a guardar campañas ni recordar la configuración de red. Permite los datos de sitio para esta página y recarga.');
+  }
 }
-boot();
+/* Red de seguridad: si algo del arranque falla, mejor decirlo que dejar la pantalla
+   en blanco. Una pantalla vacía sin explicación cuesta horas de diagnóstico — hoy nos
+   costó justamente eso. */
+try{ boot(); }
+catch(e){
+  try{
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;inset:0;z-index:9999;background:#15110f;color:#ece4d6;'+
+      'font:14px/1.6 "Segoe UI",system-ui,sans-serif;padding:32px;overflow:auto';
+    d.innerHTML='<h2 style="color:#d6a64a;font-family:Georgia,serif">El VTT no pudo arrancar</h2>'+
+      '<p>Se cortó la carga por este error:</p>'+
+      '<pre style="background:#241d16;border:1px solid #3a2f26;border-radius:8px;padding:12px;white-space:pre-wrap">'+
+      String(e&&e.message||e)+'</pre>'+
+      '<p style="color:#a9988a">Pásale este texto al asistente. Si dice algo de <b>localStorage</b> o <b>SecurityError</b>, '+
+      'es que este navegador tiene bloqueado el almacenamiento del sitio: permítelo para esta página y recarga.</p>';
+    document.body.appendChild(d);
+  }catch(_){}
+  throw e;
+}
 </script>
 </body>
 </html>
