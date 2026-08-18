@@ -34,6 +34,22 @@ const roster = (room) => ({
   players: [...room.players.entries()].map(([id, s]) => ({ id, name: s.__name || 'Player' }))
 });
 
+/* Da de baja un socket de su sala y avisa a quien corresponda. Se llama desde dos
+   sitios —el aviso {t:'bye'} y el evento 'close'— así que tiene que ser idempotente:
+   el mismo socket pasará por aquí dos veces en una salida limpia. */
+function leaveRoom(ws) {
+  const r = rooms.get(ws.__code); if (!r || ws.__left) return;
+  ws.__left = true;
+  if (ws.__role === 'host') {
+    if (r.host === ws) { r.host = null; r.players.forEach(p => send(p, { t: 'sys', kind: 'no-host' })); }
+  } else {
+    r.players.delete(ws.__id);
+    if (r.host) { send(r.host, { t: 'sys', kind: 'leave', id: ws.__id }); send(r.host, roster(r)); }
+  }
+  // sala vacía: soltarla para no acumular memoria en un proceso de larga vida
+  if (!r.host && r.players.size === 0) rooms.delete(ws.__code);
+}
+
 const server = http.createServer((req, res) => {
   if (req.url === '/ping' || req.url === '/') {
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
@@ -98,10 +114,10 @@ wss.on('connection', (ws, req) => {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }   // basura: ignorar
     if (!msg || typeof msg.t !== 'string') return;
-    /* Salida explícita. Sin esto la baja tarda ~10s: el cierre del socket viaja
-       lento a través del proxy y el servidor no se entera hasta el latido. Con el
-       aviso, el resto de la mesa lo ve al instante. */
-    if (msg.t === 'bye') { try { ws.close(1000, 'bye'); } catch (e) {} return; }
+    /* Salida explícita. Ojo: hay que dar de baja AQUÍ mismo, no limitarse a cerrar
+       el socket y confiar en el evento 'close' — ese cierre vuelve a viajar por el
+       proxy y tarda otros ~10s, que es justo lo que se quería evitar. */
+    if (msg.t === 'bye') { leaveRoom(ws); try { ws.close(1000, 'bye'); } catch (e) {} return; }
     if (ws.__role === 'host') {
       // el GM difunde a todos los jugadores; se reenvía tal cual, sin interpretarlo
       room.players.forEach(p => { if (p !== ws) send(p, msg); });
@@ -112,20 +128,7 @@ wss.on('connection', (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
-    const r = rooms.get(ws.__code); if (!r) return;
-    if (ws.__role === 'host') {
-      if (r.host === ws) {
-        r.host = null;
-        r.players.forEach(p => send(p, { t: 'sys', kind: 'no-host' }));
-      }
-    } else {
-      r.players.delete(ws.__id);
-      if (r.host) { send(r.host, { t: 'sys', kind: 'leave', id: ws.__id }); send(r.host, roster(r)); }
-    }
-    // sala vacía: soltarla para no acumular memoria en un proceso de larga vida
-    if (!r.host && r.players.size === 0) rooms.delete(ws.__code);
-  });
+  ws.on('close', () => leaveRoom(ws));
 
   ws.on('error', () => {});
 });
