@@ -229,6 +229,15 @@
     background:repeating-linear-gradient(45deg,#d9d0bd 0 2px,#c6bda8 2px 5px)}
   #mapwrap.paper .cell{border-color:rgba(120,140,160,.28)}
   #mapwrap.paper .cell.rock{border-color:transparent}
+  /* Grilla de referencia opcional (v11.1, pedida a raíz del VTT de Fonz): sin esto, en
+     papel las celdas sin excavar (rock) no muestran ninguna línea — útil para calzar
+     dibujos/props antes de pintar terreno. Muy suave a propósito, es sólo referencia.
+     Shorthand completo y no sólo border-color: la roca trae `border:0` inline (ancho y
+     estilo en cero), cambiar sólo el color no dibuja nada. No toca las celdas YA
+     excavadas en papel — ahí el contorno de tinta (grueso, sólo entre suelo y roca) es
+     a propósito y esto lo pisaría. */
+  #mapwrap.gridoverlay:not(.paper) .cell{border:1px solid rgba(255,255,255,.14)!important}
+  #mapwrap.gridoverlay.paper .cell.rock{border:1px solid rgba(120,140,160,.18)!important}
   #mapwrap.paper .wall{background:#1a1714;box-shadow:none}
   #mapwrap.paper .door{background:#8a5a1e;box-shadow:none}
   #initpanel{flex:1;display:flex;flex-direction:column;min-height:0}
@@ -287,6 +296,39 @@
   .diephys.shape4{align-items:flex-end;padding-bottom:4px}
   .diephys.shape10,.diephys.shape12{align-items:center;padding-bottom:0}
   .diephys.settle{animation:settle .35s cubic-bezier(.2,1.4,.4,1)}
+  /* Rueda de dados (v12, sacada del VTT de Fonz — su lógica de tirada ya era casi
+     idéntica a la nuestra, esto es sobre todo el trasplante visual). */
+  .diceLayout{display:flex;gap:20px;align-items:flex-start}
+  .diceCircleWrap{flex:0 0 66%;max-width:66%;margin:0;padding:0}
+  .diceCircle{position:relative;width:100%;max-width:640px;max-height:72vh;aspect-ratio:1/1;margin:0 auto}
+  .diceQuickWrap{flex:0 0 32%;max-width:32%;min-width:170px}
+  #diceCircleSvg{width:100%;height:100%;display:block}
+  .wedge{cursor:pointer;stroke:var(--line);stroke-width:1.5;transition:filter .1s}
+  .wedge:hover{filter:brightness(1.18)}
+  .wedge.selected{filter:brightness(1.35);stroke:#fff;stroke-width:2.5}
+  .wedge:disabled,.wedge.disabled{cursor:default;opacity:.35}
+  .wedgeLabel{font-family:Georgia,serif;font-weight:600;fill:#12140f;pointer-events:none;text-anchor:middle;dominant-baseline:middle}
+  .wedgeLabel.light{fill:#f3f3ee}
+  .wedgeLegend{font-family:Georgia,serif;font-size:11px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle;pointer-events:none;letter-spacing:.03em}
+  .qaSubtitle{font-size:11px;color:var(--dim);font-weight:400;margin-left:6px}
+  .dcCenter{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:44%}
+  .dcPoolPreview{font-size:19px;color:var(--dim);line-height:1.4}
+  .dcResult{margin-top:4px}
+  .dcResult .dcLabel{font-size:15px;color:var(--dim)}
+  .dcResult .dcTotal{font-family:Georgia,serif;font-size:46px;font-weight:800;color:var(--dim);text-shadow:0 0 10px rgba(200,180,150,.25)}
+  .dcResult .dcOutcome{font-size:18px;margin-top:5px;font-weight:700;color:var(--dim)}
+  .dcResult .dcOutcome.hope{color:var(--hope)!important}
+  .dcResult .dcOutcome.fail{color:var(--crimson)!important}
+  .dcResult .dcOutcome.fear{color:var(--fear)!important}
+  .dcResult .dcOutcome.crit{color:var(--gold)!important}
+  #diceCenterResult .diephys{width:34px;height:34px;font-size:13px;pointer-events:none}
+  #diceCenterResult .die{width:40px;height:40px;font-size:18px;border-radius:7px;pointer-events:none}
+  #diceCenterResult .die.hope{border-color:#f3f3ee}
+  #diceCenterResult .die.fear{border-color:#e0483a}
+  @media (max-width:900px){
+    .diceLayout{flex-direction:column}
+    .diceCircleWrap{max-width:100%;flex:none;width:100%}
+  }
   .gcard.activeCard{border-color:var(--ok);box-shadow:0 0 10px rgba(90,164,106,.45)}
   @keyframes settle{0%{transform:scale(1.35) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
   .outcome{font-family:Georgia,serif;font-size:18px;font-weight:700;margin:8px 0}
@@ -437,6 +479,7 @@
         <button class="xs gmonly" onclick="delFloor()" title="delete this floor">🗑</button>
         <span class="mtsep"></span>
         <button class="xs" id="skinBtn" onclick="toggleMapSkin()" title="cambia entre el mapa en tinta sobre papel y el estilo oscuro">🗺 papel</button>
+        <button class="xs" id="gridOverlayBtn" onclick="toggleGridOverlay()" title="marca una grilla de referencia muy suave sobre todo el mapa, incluida la roca sin excavar">▦ grilla</button>
         <span id="zoomctl" style="display:flex;gap:2px;align-items:center"><button class="xs" onclick="setZoom(mapZoom/1.25,null)" title="zoom out (wheel)">−</button><span id="zoomlbl" onclick="setZoom(1,null)" title="reset zoom" style="cursor:pointer;font-size:11px;min-width:34px;text-align:center">100%</span><button class="xs" onclick="setZoom(mapZoom*1.25,null)" title="zoom in (wheel)">+</button></span>
         <select id="scaleSel" class="gmonly" onchange="setScale(+this.value)" title="feet per square (affects range rings)">
           <option value="5">5 ft/sq</option><option value="10">10 ft/sq</option><option value="20">20 ft/sq</option>
@@ -464,21 +507,33 @@
           <option value="p-sofa">Sofá</option><option value="p-hearth">Chimenea</option>
           <option value="p-stairup">Escalera ↑</option><option value="p-stairdn">Escalera ↓</option>
         </select>
-        <input type="color" id="penColor" title="your pen color" style="display:none;width:34px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none">
+        <span id="inkTools" style="display:none;gap:6px;align-items:center;flex-wrap:wrap">
+          <span id="inkSwatches" style="display:flex;gap:3px"></span>
+          <input type="color" id="penColor" title="color personalizado" style="width:26px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:none">
+          <select id="penWidth" title="grosor del trazo">
+            <option value="thin">Fino</option>
+            <option value="normal" selected>Normal</option>
+            <option value="thick">Grueso</option>
+          </select>
+          <span class="mtsep"></span>
+          <div id="layerBar" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"></div>
+        </span>
         <span class="muted" id="edgehint" style="display:none">L: wall → door · R: remove</span>
         <span id="seltools" style="display:none;gap:3px;align-items:center">
           <span class="muted" style="font-size:11px">relleno:</span>
           <span id="shapebar" style="display:flex;gap:3px"></span>
           <span class="mtsep"></span>
-          <button class="xs primary" onclick="roomFromSelection()" title="convierte la zona dibujada en una pieza (Enter)">⬚ agregar pieza</button>
-          <button class="xs" onclick="eraseSelection()" title="borra el terreno de la zona (Supr)">⌫ borrar</button>
+          <button id="selAddRoom" class="xs primary" onclick="roomFromSelection()" title="convierte la zona dibujada en una pieza (Enter)">⬚ agregar pieza</button>
+          <button id="selErase" class="xs" onclick="eraseSelection()" title="borra el terreno de la zona (Supr)">⌫ borrar</button>
+          <button id="selFogHide" class="xs" onclick="fogSelection(0)" title="tapa con niebla sólo la zona seleccionada" style="display:none">⬛ cubrir selección</button>
+          <button id="selFogShow" class="xs" onclick="fogSelection(1)" title="revela sólo la zona seleccionada" style="display:none">⬜ revelar selección</button>
           <button class="xs" onclick="clearSelection()" title="soltar la zona (Esc)">✕</button>
           <span class="muted" id="selcount" style="font-size:11px"></span>
         </span>
         <span id="fogtools" style="display:none;gap:3px">
-          <button class="xs" onclick="dispatch({kind:'fogall',val:0})" title="cover the whole floor">⬛ cover</button>
-          <button class="xs" onclick="dispatch({kind:'fogall',val:1})" title="reveal the whole floor">⬜ reveal</button>
-          <span class="muted" style="font-size:11px">Shift+click: toggle una pieza</span>
+          <button class="xs" onclick="dispatch({kind:'fogall',val:0})" title="tapa con niebla todo el piso">⬛ cubrir todo</button>
+          <button class="xs" onclick="dispatch({kind:'fogall',val:1})" title="revela todo el piso">⬜ revelar todo</button>
+          <span class="muted" style="font-size:11px">Shift+click: toggle una pieza · arrastra para pintar niebla, o marca una zona con rect/círculo/lazo</span>
         </span>
         <span class="mtsep"></span>
         <button class="xs" onclick="openToken()">+ token</button>
@@ -674,24 +729,23 @@
   </div>
 
   <!-- DICE -->
-  <div class="panel scroll panegrid" id="panel-dice" data-pane="dice" data-label="Dice">
-    <div class="card pg-full" style="padding:6px 10px"><div class="row" style="align-items:center">
-      <b style="font-size:12px">🛡 Save:</b><span id="saveBtns" class="row" style="gap:4px"></span>
-      <span class="muted" style="font-size:10px;margin-left:auto">duality + trait · reaction, no Hope/Fear (RAW)</span>
-    </div></div>
-    <div class="card"><h4>Dice Pool</h4>
-      <div class="row" id="dieShelf"></div>
-      <div class="row" id="traitChips" style="margin-top:6px"></div>
-      <div class="row" style="margin-top:6px"><div id="poolView" class="row" style="flex:1;min-height:24px"></div></div>
-      <div class="row" style="margin-top:6px"><label>modifier</label><input id="poolMod" type="number" value="0" style="width:60px">
-        <button class="primary sm" onclick="rollPool()">🎲 Roll</button>
-        <button class="sm" style="border-color:var(--hope);color:var(--hope)" onclick="dualityPool()">🎭 Duality</button>
-        <button class="sm" id="advBtn" onclick="tgAdv(1)" title="advantage: +d6 on your next duality roll (RAW)">▲ Adv</button>
-        <button class="sm" id="disBtn" onclick="tgAdv(-1)" title="disadvantage: −d6 on your next duality roll (RAW)">▼ Dis</button>
-        <button class="sm" onclick="clearPool()">clear</button></div>
-      <p class="muted" style="font-size:11px;margin:4px 0 0">trait buttons add their modifier · ×Prof multiplies the dice · 🎭 rolls Hope &amp; Fear + modifiers</p>
+  <div class="panel scroll" id="panel-dice" data-pane="dice" data-label="Dice">
+    <div class="diceLayout">
+      <div class="diceQuickWrap">
+        <div class="card"><h4>Tiradas rápidas <span class="qaSubtitle">equipo, cartas y PNJ</span></h4><div id="qaList"></div></div>
+        <div class="row" id="diceProfRow" style="margin-top:10px"></div>
+        <p class="muted" style="font-size:11px;margin-top:10px">Anillo izquierdo = Salvación (reacción, sin Esperanza/Miedo · RAW) · Anillo derecho = Chequeo de Habilidad (se suma a tu tirada) · 🎭 Dualidad tira Esperanza y Miedo + modificadores</p>
+      </div>
+      <div class="diceCircleWrap">
+        <div class="diceCircle" id="diceCircle">
+          <svg id="diceCircleSvg" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="dcCenter">
+            <div id="dcPoolPreview" class="dcPoolPreview">sin dados seleccionados</div>
+            <div id="diceCenterResult" class="dcResult" style="display:none"></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card pg-wide"><h4>Quick rolls — gear, cards &amp; NPCs</h4><div id="qaList"></div></div>
   </div>
 
   <!-- RULES -->
@@ -821,7 +875,7 @@ function terrainStyle(id){
   const t=TERRAIN_MAP[id]; return t?('background:'+t.color):'';
 }
 
-let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strokes:[], characters:{}, fear:0, floors:null, floorIdx:0, fog:{}, aspects:[],
+let STATE={ grid:{cols:21,rows:26,cell:30}, tiles:{}, edges:{}, tokens:[], strokes:[], characters:{}, fear:0, floors:null, floorIdx:0, fog:{}, aspects:[],
   npcLibrary:[], envLibrary:[], encounter:[], initiative:[], countdowns:[], envFeatures:[], customGear:{armor:[],weapons:[],items:[]}, presence:[], initRound:1, log:[], lastRoll:null };
 /* `socket` es el WebSocket vivo; `sock` el envoltorio con reintentos que lo creó.
    `peer` es un alias de socket que se conserva porque medio código pregunta
@@ -830,11 +884,12 @@ let STATE={ grid:{cols:24,rows:16,cell:30}, tiles:{}, edges:{}, tokens:[], strok
 let ME={ id:null, name:'', isHost:false, role:'player', peer:null, socket:null, sock:null };
 let selectedTerrain='e0', mapMode='paint', painting=false, shownRoll=null, work=null, stepQueue=[], stepCtx=null, npcEditId=null, activeTab=null;
 let selShape='rect', SEL=new Set(), selDrag=null;   // area-selection state (see AREA SELECTION below)
+let activeInkLayer=null;   // capa activa del Lápiz — sólo local, no se sincroniza (como selShape)
 /* Leer localStorage aquí tiene que ir protegido: en modo privado o con las cookies
    bloqueadas lanza, y al estar en el cuerpo del script tumbaría la carga entera —
    nada por debajo llegaría a inicializarse. */
-let selRoom=null, mapSkin='paper';
-try{ mapSkin=lsGet('ph-map-skin')||'paper'; }catch(e){}
+let selRoom=null, mapSkin='paper', gridOverlay=false;
+try{ mapSkin=lsGet('ph-map-skin')||'paper'; gridOverlay=lsGet('ph-grid-overlay')==='1'; }catch(e){}
 
 function rid(n){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
 
@@ -857,7 +912,7 @@ async function fsEnsurePerm(h){ if(!h)return false;
     return (await h.requestPermission({mode:'readwrite'}))==='granted';
   }catch(e){return false}}
 async function campLinkFile(cmp){
-  if(!FSOK){alert('Tu navegador no soporta guardado directo a archivo (usa Chrome o Edge). La campaña se sigue guardando en el navegador.');return;}
+  if(!FSOK){setStatus('Tu navegador no soporta guardado directo a archivo (usa Chrome o Edge). La campaña se sigue guardando en el navegador.');return;}
   try{
     const h=await showSaveFilePicker({suggestedName:(cmp.name||'campania').replace(/[^a-z0-9_-]+/gi,'_')+'.pulpheart.json',
       types:[{description:'PulpHeart campaign',accept:{'application/json':['.json']}}]});
@@ -888,11 +943,11 @@ async function campFileRead(cmp){
 }
 async function openCampaignFile(){
   const n=saveName(); if(!n){setStatus('Pon tu nombre primero.');return;}
-  if(!FSOK){alert('Necesitas Chrome o Edge para abrir campañas desde archivo.');return;}
+  if(!FSOK){setStatus('Necesitas Chrome o Edge para abrir campañas desde archivo.');return;}
   try{
     const hs=await showOpenFilePicker({types:[{description:'PulpHeart campaign',accept:{'application/json':['.json']}}]});
     const h=hs[0]; const f=await h.getFile(); const d=JSON.parse(await f.text());
-    if(!d||d.type!=='pulpheart-campaign'||!d.state){alert('No es un archivo de campaña válido.');return;}
+    if(!d||d.type!=='pulpheart-campaign'||!d.state){setStatus('No es un archivo de campaña válido.');return;}
     const cmp={id:d.id||rid(8),name:d.name||'Campaña',code:String(d.code||rid(6)).toUpperCase(),created:Date.now(),lastPlayed:Date.now()};
     campTouch(cmp);
     try{lsSet('ph-camp-'+cmp.id,JSON.stringify({v:1,saved:d.saved,state:d.state}));}catch(e){}
@@ -915,7 +970,7 @@ catch(e){ LS_OK=false; }
 function lsGet(k){ if(!LS_OK)return null; try{ return localStorage.getItem(k); }catch(e){ LS_OK=false; return null; } }
 function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){ LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v9';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v12.2';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1046,18 +1101,9 @@ function campRename(id,v){
   if(CAMP&&CAMP.id===id){CAMP.name=c.name; STATE.campName=c.name;}
   renderCampaigns();
 }
-/* Confirmación de dos toques, síncrona y sin depender del navegador. Sustituye a
-   confirm(): cuando los diálogos están bloqueados confirm() devuelve false, así que el
-   botón simplemente no hacía nada. Aquí el primer toque arma y avisa, el segundo ejecuta. */
-let CONF_ARM=null,CONF_T=null;
-function okDouble(key,msg){
-  if(CONF_ARM===key){ clearTimeout(CONF_T); CONF_ARM=null; return true; }
-  CONF_ARM=key; clearTimeout(CONF_T);
-  CONF_T=setTimeout(()=>{CONF_ARM=null;},5000);
-  const m='⚠ '+msg+'  ·  Pulsa otra vez para confirmar.';
-  flash(m); setStatus(m);   /* el toast dura poco y algunos botones viven en el modal */
-  return false;
-}
+/* Sebas pidió quitar la confirmación de dos toques: las acciones marcadas con
+   okDouble() ahora ejecutan directo al primer toque, sin paso intermedio. */
+function okDouble(key,msg){ return true; }
 /* Envoltorio de prompt() que no falla en silencio: si el navegador tiene los diálogos
    bloqueados devuelve null igual que si cancelaras, y sin esto el usuario no tiene
    forma de distinguirlo. */
@@ -1066,7 +1112,7 @@ function askText(msg,def){
   try{ v=prompt(msg,def===undefined?'':def); }catch(e){ v=null; }
   if(v===null&&!askText.__warned){
     askText.__warned=true;
-    flash('Si no apareció ningún cuadro de texto, este navegador tiene bloqueados los diálogos de la página. Búscalo en el candado de la barra de direcciones.');
+    setStatus('Si no apareció ningún cuadro de texto, este navegador tiene bloqueados los diálogos de la página. Búscalo en el candado de la barra de direcciones.');
   }
   return v;
 }
@@ -1099,10 +1145,10 @@ async function enterCampaign(cmp,seat,fresh){
   }
 }
 function gmSelfTest(){
-  if(!CAMP){alert('Entra a una campaña primero.');return;}
+  if(!CAMP){setStatus('Entra a una campaña primero.');return;}
   const base=relayBase();
-  if(!base){alert('Todavía no hay relay configurado. Usa "config. de red" abajo del modal de campañas.');return;}
-  if(!ME.socket||!ME.isHost){alert('El auto-test es para el GM hosteando. Estado actual: '+(ME.socket?'jugador':'SIN CONEXIÓN — estás en modo local, los jugadores no pueden entrar. Recarga y vuelve a entrar como GM.'));return;}
+  if(!base){setStatus('Todavía no hay relay configurado. Usa "config. de red" abajo del modal de campañas.');return;}
+  if(!ME.socket||!ME.isHost){setStatus('El auto-test es para el GM hosteando. Estado actual: '+(ME.socket?'jugador':'SIN CONEXIÓN — estás en modo local, los jugadores no pueden entrar. Recarga y vuelve a entrar como GM.'));return;}
   flash('Probando la sala desde afuera…');
   /* Dos comprobaciones separadas a propósito: primero que el servidor esté vivo,
      después que la sala responda. Si sólo probáramos la sala, un relay dormido y
@@ -1110,7 +1156,7 @@ function gmSelfTest(){
   fetch(relayHttp()+'/ping',{cache:'no-store'}).then(r=>r.json()).then(()=>{
     const t=new WebSocket(base+'/room/'+encodeURIComponent(CAMP.code)+'?role=player&id=selftest-'+rid(4)+'&name=__selftest');
     let ok=false;
-    const done=(msg)=>{try{t.close();}catch(e){} alert(msg);};
+    const done=(msg)=>{try{t.close();}catch(e){} setStatus(msg);};
     const timer=setTimeout(()=>{if(!ok)done('✗ El relay respondió pero la sala no contestó en 10s.\nRecarga y vuelve a entrar a la campaña como GM.');},10000);
     t.onmessage=(ev)=>{ let d; try{d=JSON.parse(ev.data);}catch(e){return;}
       if(d.t==='sys'&&d.kind==='no-host'){ok=true;clearTimeout(timer);
@@ -1121,7 +1167,7 @@ function gmSelfTest(){
       done('✓ La sala '+CAMP.code+' acepta conexiones.\nSi un jugador no entra, revisa que use el MISMO relay y el mismo código.');} },2500); };
     t.onerror=()=>{clearTimeout(timer); if(!ok)done('✗ Falló la conexión a la sala. Revisa la URL del relay en "config. de red".');};
   }).catch(()=>{
-    alert('✗ No pude ni siquiera alcanzar el relay ('+relayHttp()+'/ping).\nPuede estar caído, la URL mal escrita, o esta red lo bloquea. Prueba otra red antes de asumir que el problema es de tu mesa.');
+    setStatus('✗ No pude ni siquiera alcanzar el relay ('+relayHttp()+'/ping). Puede estar caído, la URL mal escrita, o esta red lo bloquea. Prueba otra red antes de asumir que el problema es de tu mesa.');
   });
 }
 function gmLocalFallback(){
@@ -1250,19 +1296,28 @@ function playerReceive(d){ if(d.t==='state'){ STATE=d.state;
 function activeFloorId(){return ((STATE.floors||[])[STATE.floorIdx||0]||{}).id||'fl0';}
 function relinkFloor(){const f=(STATE.floors||[])[STATE.floorIdx]; if(!f)return;
   f.grid=STATE.grid; f.tiles=STATE.tiles; f.edges=STATE.edges; f.strokes=STATE.strokes||[]; f.fog=STATE.fog||(STATE.fog={}); f.aspects=STATE.aspects||(STATE.aspects=[]);
-  f.rooms=STATE.rooms||(STATE.rooms=[]);}
+  f.rooms=STATE.rooms||(STATE.rooms=[]); f.inkLayers=STATE.inkLayers||(STATE.inkLayers=[]);}
 function normalizeFloors(){
   if(!STATE.floors||!STATE.floors.length){
     STATE.fog=STATE.fog||{};
     STATE.aspects=STATE.aspects||[];
     STATE.rooms=STATE.rooms||[];
-    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects,rooms:STATE.rooms}];
+    STATE.inkLayers=STATE.inkLayers&&STATE.inkLayers.length?STATE.inkLayers:[{id:'L1',name:'Capa 1',visible:true}];
+    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects,rooms:STATE.rooms,inkLayers:STATE.inkLayers}];
     STATE.floorIdx=0;
   }
-  // mapas guardados antes de v7 no traen rooms — dárselo aquí evita comprobarlo en cada uso
-  (STATE.floors||[]).forEach(f=>{ if(!f.rooms)f.rooms=[]; });
+  // mapas guardados antes de v7 no traen rooms — dárselo aquí evita comprobarlo en cada uso.
+  // Igual para inkLayers (v11): sin capas, los trazos existentes se asignan todos a "Capa 1".
+  (STATE.floors||[]).forEach(f=>{ if(!f.rooms)f.rooms=[];
+    if(!f.inkLayers||!f.inkLayers.length)f.inkLayers=[{id:'L1',name:'Capa 1',visible:true}];
+    (f.strokes||[]).forEach(s=>{ if(!s.layer)s.layer=f.inkLayers[0].id; }); });
   if(!STATE.rooms)STATE.rooms=[];
   if(STATE.floorIdx==null||STATE.floorIdx<0||STATE.floorIdx>=STATE.floors.length)STATE.floorIdx=0;
+  /* Sólo si STATE.inkLayers nunca se inicializó (campaña guardada antes de v11):
+     toma el default que el forEach de arriba ya armó en la pieza. Si ya existe (caso
+     normal, incluso recién mutado por un dispatch), NO se toca — relinkFloor() de abajo
+     lo empuja hacia la pieza, no al revés; pisarlo aquí perdería ediciones recientes. */
+  if(!STATE.inkLayers)STATE.inkLayers=STATE.floors[STATE.floorIdx].inkLayers;
   relinkFloor();
   const fid=activeFloorId();
   (STATE.tokens||[]).forEach(t=>{if(!t.floor)t.floor=fid;});
@@ -1271,9 +1326,10 @@ function switchFloorLocal(i){
   if(!STATE.floors||!STATE.floors[i])return;
   relinkFloor();
   STATE.floorIdx=i; const f=STATE.floors[i];
-  f.grid=f.grid||{cols:24,rows:16,cell:30,scale:5}; f.tiles=f.tiles||{}; f.edges=f.edges||{}; f.strokes=f.strokes||[]; f.fog=f.fog||{}; f.aspects=f.aspects||[]; f.rooms=f.rooms||[];
-  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects; STATE.rooms=f.rooms;
-  selRoom=null;
+  f.grid=f.grid||{cols:21,rows:26,cell:30,scale:5}; f.tiles=f.tiles||{}; f.edges=f.edges||{}; f.strokes=f.strokes||[]; f.fog=f.fog||{}; f.aspects=f.aspects||[]; f.rooms=f.rooms||[];
+  f.inkLayers=f.inkLayers&&f.inkLayers.length?f.inkLayers:[{id:'L1',name:'Capa 1',visible:true}];
+  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects; STATE.rooms=f.rooms; STATE.inkLayers=f.inkLayers;
+  selRoom=null; activeInkLayer=null;
 }
 function renderFloorUI(){
   const sel=document.getElementById('floorSel'); if(!sel||!STATE.floors)return;
@@ -1285,7 +1341,7 @@ function renderFloorUI(){
 function gmSwitchFloor(i){ if(!(ME.isHost||!ME.peer)){renderFloorUI();return;} dispatch({kind:'floorswitch',idx:i}); }
 function addFloor(){ const n=askText('Floor name?','Piso '+((STATE.floors||[]).length+1)); if(n===null)return; dispatch({kind:'flooradd',name:n,id:rid(4)}); }
 function renameFloor(){ const f=STATE.floors[STATE.floorIdx]; const n=askText('Rename floor:',f.name||''); if(n===null)return; dispatch({kind:'floorrename',idx:STATE.floorIdx,name:n}); }
-function delFloor(){ if((STATE.floors||[]).length<2){alert('At least one floor is required.');return;}
+function delFloor(){ if((STATE.floors||[]).length<2){setStatus('At least one floor is required.');return;}
   if(!okDouble('floordel'+STATE.floorIdx,'Borrar el piso "'+(STATE.floors[STATE.floorIdx].name||'')+'" y sus fichas.'))return;
   dispatch({kind:'floordel',idx:STATE.floorIdx}); }
 function renderAspects(){
@@ -1368,7 +1424,9 @@ function renderFog(){
 function setupFog(){
   const g=document.getElementById('grid'); if(!g||g.__fog)return; g.__fog=true;
   let fogging=false,fogVal=1,cells=[],seen={};
-  function fc(t){ if(mapMode!=='fog'||!(ME.isHost||!ME.peer)||!t.classList.contains('cell'))return;
+  /* Sólo con la forma «libre»; rect/círculo/lazo los lleva setupSelect (fogSelection). */
+  const freeMode=()=>mapMode==='fog'&&selShape==='free'&&(ME.isHost||!ME.peer);
+  function fc(t){ if(!freeMode()||!t.classList.contains('cell'))return;
     const r=+t.dataset.r,c=+t.dataset.c,k=r+','+c; if(seen[k])return; seen[k]=1; cells.push({r,c});
     const cvs=document.getElementById('fogcv'); const cl=STATE.grid.cell;
     if(cvs){const x=cvs.getContext('2d');
@@ -1376,7 +1434,7 @@ function setupFog(){
       else{x.fillStyle='rgba(8,6,5,.45)'; x.fillRect(c*cl,r*cl,cl,cl);}}}
   g.addEventListener('pointerdown',e=>{ if(mapMode!=='fog')return;
     if(e.shiftKey&&e.button===0){const t=e.target; if(t.classList.contains('cell'))revealRoom(+t.dataset.r,+t.dataset.c); return;}
-    if(e.button!==0&&e.button!==2)return;
+    if(!freeMode()||(e.button!==0&&e.button!==2))return;
     fogging=true; fogVal=(e.button===0)?1:0; cells=[]; seen={}; fc(e.target);});
   g.addEventListener('pointerover',e=>{if(fogging)fc(e.target);});
   window.addEventListener('pointerup',()=>{if(fogging){fogging=false; if(cells.length)dispatch({kind:'fog',cells,val:fogVal});}});
@@ -1435,7 +1493,7 @@ function applyFloorsFile(d){
     });
     floors.push({id:f.id||rid(4),name:String(f.name||('Piso '+(fi+1))).slice(0,24),grid:g,tiles,edges,strokes,fog:{},aspects,rooms});
   });
-  if(!floors.length){alert('No valid floors in this file');return;}
+  if(!floors.length){setStatus('No valid floors in this file');return;}
   const ids=floors.map(f=>f.id);
   const tokens=(d.tokens||[]).filter(t=>t&&typeof t==='object').map(t=>({id:rid(6),
     label:String(t.label||'?').slice(0,24),
@@ -1504,6 +1562,13 @@ function apply(a){
     case 'addtoken': if(!a.token.floor)a.token.floor=activeFloorId(); STATE.tokens.push(a.token); break;
     case 'stroke': (STATE.strokes||(STATE.strokes=[])).push(a.stroke); if(STATE.strokes.length>500)STATE.strokes.shift(); break;
     case 'delstroke': STATE.strokes=(STATE.strokes||[]).filter(s=>s.id!==a.id); break;
+    /* ---- capas del lápiz (v11, sacado del VTT de Fonz) ---- */
+    case 'inklayeradd': (STATE.inkLayers=STATE.inkLayers||[]).push(a.layer); break;
+    case 'inklayerdel':{ STATE.inkLayers=(STATE.inkLayers||[]).filter(l=>l.id!==a.layerId);
+      STATE.strokes=(STATE.strokes||[]).filter(s=>s.layer!==a.layerId); break;}
+    case 'inklayervis':{ const l=(STATE.inkLayers||[]).find(x=>x.id===a.layerId); if(l)l.visible=!l.visible; break;}
+    case 'inklayerclear': STATE.strokes=(STATE.strokes||[]).filter(s=>s.layer!==a.layerId); break;
+    case 'inklayerrename':{ const l=(STATE.inkLayers||[]).find(x=>x.id===a.layerId); if(l)l.name=String(a.name||l.name).slice(0,24); break;}
     case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;
       /* Vía 1 de las tres acordadas: pasar al lado revela la puerta secreta. Sólo lo
          evalúa el GM, que es quien tiene el estado bueno, y se difunde a la mesa. */
@@ -1789,7 +1854,7 @@ function equipCardHTML(e,ch,ed,slot,kind){
 }
 function openEquip(id,slot){
   const ch=STATE.characters[id];
-  if(slot==='secondary'&&ch.primary&&ch.primary.burden==='Two-Handed'){alert('Your primary weapon is Two-Handed — unequip or change it to use a secondary.');return;}
+  if(slot==='secondary'&&ch.primary&&ch.primary.burden==='Two-Handed'){setStatus('Your primary weapon is Two-Handed — unequip or change it to use a secondary.');return;}
   const maxT=tierOf(ch.level); const g=CG();
   let pool, title;
   if(slot==='armor'){pool=EQUIP.armor.concat(g.armor).filter(a=>(a.tier||1)<=maxT); title='Equip armor (up to Tier '+maxT+')';}
@@ -2211,13 +2276,13 @@ function portraitClear(id){
   c.portrait=null; dispatch({kind:'upchar',char:c}); flash('Retrato quitado');
 }
 function moveCard(id,key,to){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); if(ch.activeCards)delete ch.activeCards[key];
-  if(to==='loadout'){ if(ch.loadout.length>=LOADOUT_MAX){alert('Loadout full ('+LOADOUT_MAX+').');return;} ch.loadout.push(key);} else ch.vault.push(key);
+  if(to==='loadout'){ if(ch.loadout.length>=LOADOUT_MAX){setStatus('Loadout full ('+LOADOUT_MAX+').');return;} ch.loadout.push(key);} else ch.vault.push(key);
   dispatch({kind:'upchar',char:ch});}
 function removeCard(id,key){const ch=copyChar(id); ch.loadout=ch.loadout.filter(k=>k!==key); ch.vault=ch.vault.filter(k=>k!==key); if(ch.activeCards)delete ch.activeCards[key]; dispatch({kind:'upchar',char:ch});}
 
 function openCardPicker(id,dest){
   const ch=STATE.characters[id]; const doms=accessibleDomains(ch);
-  if(!doms.length){alert('Choose a class first.');return;}
+  if(!doms.length){setStatus('Choose a class first.');return;}
   const have=new Set([...ch.loadout,...ch.vault]);
   const pool=availableCards(ch,have);
   const box=document.getElementById('genBox'); box.classList.add('wide');
@@ -2242,9 +2307,9 @@ function tierOf(lv){return lv<=1?1:lv<=4?2:lv<=7?3:4;}
 function tierLevels(t){return t===2?[2,3,4]:t===3?[5,6,7]:t===4?[8,9,10]:[1];}
 function slotsCost(eff){return (eff==='proficiency+1'||eff==='multiclass')?2:1;}
 function openLevelUp(id){
-  const ch=STATE.characters[id]; if(ch.level>=10){alert('Already max level.');return;}
+  const ch=STATE.characters[id]; if(ch.level>=10){setStatus('Already max level.');return;}
   const target=ch.level+1, tier=tierOf(target);
-  const td=SRD.leveling.tiers.find(t=>t.tier===tier); if(!td){alert('No tier data.');return;}
+  const td=SRD.leveling.tiers.find(t=>t.tier===tier); if(!td){setStatus('No tier data.');return;}
   const tl=tierLevels(tier);
   const used={}; (ch.advances||[]).filter(a=>tl.includes(a.level)).forEach(a=>a.picks.forEach(e=>used[e]=(used[e]||0)+1));
   const multiTaken=(ch.advances||[]).some(a=>a.picks.includes('multiclass'))||ch.multiclass;
@@ -2407,21 +2472,31 @@ function setMapMode(m){
   mapMode=m;
   // al entrar en Dibujo desde fuera, arrancar con la última forma que no sea muros
   if(m==='paint'&&!eraDibujo&&SHAPES.find(s=>s.id===selShape&&s.edges))selShape='rect';
+  // la niebla no edita bordes: si venías de Muros, la forma no aplica aquí
+  if(m==='fog'&&selShape==='walls')selShape='rect';
   const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
   const dib=isDrawTool(m);
   show('edgehint', m==='edges');
   show('fogtools', m==='fog','inline-flex');
-  show('penColor', m==='draw');
-  show('seltools', dib,'inline-flex');
+  show('inkTools', m==='draw','inline-flex');
+  // Niebla también usa el selector rect/círculo/lazo, para tapar o liberar una zona
+  // de una pasada en vez de sólo arrastrar casilla a casilla.
+  show('seltools', dib||m==='fog','inline-flex');
+  show('selAddRoom', dib);
+  show('selErase', dib);
+  show('selFogHide', m==='fog');
+  show('selFogShow', m==='fog');
   show('tilewrap', m==='paint');
   const tw=document.getElementById('tilewrap'); if(tw&&m==='paint')tw.open=true;
   const ps=document.getElementById('propSel'); if(ps&&m!=='paint')ps.style.display='none';
-  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',m==='paint'&&selShape!=='free');
-  if(!dib)clearSelection(true);
+  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',(m==='paint'||m==='fog')&&selShape!=='free');
+  if(!dib&&m!=='fog')clearSelection(true);
   buildPalette(); renderMap();}
 function buildShapeBar(){
   const bar=document.getElementById('shapebar'); if(!bar)return;
-  bar.innerHTML=SHAPES.map(s=>`<button class="xs${s.id===selShape?' on':''}" title="${s.title}" onclick="setSelShape('${s.id}')">${s.icon}</button>`).join('');
+  // Muros es un caso de Dibujo (edita bordes, no casillas) — no aplica en Niebla.
+  const shapes=mapMode==='fog'?SHAPES.filter(s=>!s.edges):SHAPES;
+  bar.innerHTML=shapes.map(s=>`<button class="xs${s.id===selShape?' on':''}" title="${s.title}" onclick="setSelShape('${s.id}')">${s.icon}</button>`).join('');
 }
 function buildPalette(){
   const bar=document.getElementById('hotbar'); if(!bar)return;
@@ -2502,10 +2577,12 @@ function setupMapNav(){
       const dy=e.key==='ArrowDown'?st:e.key==='ArrowUp'?-st:0;
       wrap.scrollLeft+=dx; wrap.scrollTop+=dy;
       return;}
-    if(mapMode==='paint'&&SEL.size){
+    if((mapMode==='paint'||mapMode==='fog')&&SEL.size){
       if(e.key==='Escape'){clearSelection(); e.preventDefault(); return;}
-      if(e.key==='Enter'){roomFromSelection(); e.preventDefault(); return;}   // la zona dibujada → pieza
-      if(e.key==='Delete'||e.key==='Backspace'){eraseSelection(); e.preventDefault(); return;}
+      if(mapMode==='paint'){
+        if(e.key==='Enter'){roomFromSelection(); e.preventDefault(); return;}   // la zona dibujada → pieza
+        if(e.key==='Delete'||e.key==='Backspace'){eraseSelection(); e.preventDefault(); return;}
+      }
     }
     const i=HOTKEYS.indexOf(e.key); if(i>-1&&i<HOTBAR.length){pickSlot(i); e.preventDefault(); return;}
     const md=MODEBAR.find(m=>m.key===e.key.toLowerCase());
@@ -2513,7 +2590,7 @@ function setupMapNav(){
   });
   document.addEventListener('keyup',e=>{if(e.key===' '){space=false; wrap.classList.remove('spacepan');}});
 }
-function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); applyMapSkin(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); renderRooms(); }
+function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); applyMapSkin(); applyGridOverlay(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); renderRooms(); }
 /* En un mapa a tinta la elevación no se distingue por color sino por TRAMA, que es
    como se hace a mano: lo hundido se oscurece, lo elevado se raya. Sin esto todos los
    suelos salían del mismo blanco y no se diferenciaba nada. */
@@ -2651,14 +2728,66 @@ function makeDraggable(el,t){
 function penColor(){const i=document.getElementById('penColor'); return (i&&i.value)||'#ffd24a';}
 function canErase(s){return ME.isHost||!s.owner||s.owner===ME.id;}
 function strokePts(s,cell){return s.pts.map(p=>(p[0]*cell)+','+(p[1]*cell)).join(' ');}
+/* ---- Lápiz: swatches, grosor y capas (v11, sacado del VTT de Fonz) ---- */
+const INK_PALETTE=['#ffd24a','#f2ece0','#1a1712','#c0392b','#2e7d32','#2266aa','#8a5a2b','#7a5a9e'];
+function penWidthFor(type){return type==='thin'?2:type==='thick'?8:4;}
+function curPenType(){const s=document.getElementById('penWidth'); return (s&&s.value)||'normal';}
+function buildInkSwatches(){
+  const box=document.getElementById('inkSwatches'); if(!box)return;
+  const cur=penColor();
+  box.innerHTML=INK_PALETTE.map(c=>'<span class="swatch'+(c.toLowerCase()===cur.toLowerCase()?' sel':'')+'" data-c="'+c+'" '
+    +'style="width:16px;height:16px;border-radius:3px;display:inline-block;cursor:pointer;background:'+c+';border:1px solid '
+    +(c.toLowerCase()===cur.toLowerCase()?'var(--gold)':'rgba(0,0,0,.4)')+'" onclick="pickInkColor(\''+c+'\')" title="'+c+'"></span>').join('');
+}
+function pickInkColor(c){ const pc=document.getElementById('penColor'); if(pc){pc.value=c; lsSet('hh-pen-color',c);} buildInkSwatches(); }
+function curInkLayerId(){
+  const ls=STATE.inkLayers||[]; if(!ls.length)return null;
+  if(activeInkLayer&&ls.find(l=>l.id===activeInkLayer))return activeInkLayer;
+  return ls[0].id;
+}
+function setActiveInkLayer(id){ activeInkLayer=id; renderLayerBar(); }
+function inkLayerAdd(){
+  if(!selCanEdit())return;
+  const ls=STATE.inkLayers||[];
+  if(ls.length>=8){setStatus('Máximo 8 capas.');return;}
+  const layer={id:rid(6),name:'Capa '+(ls.length+1),visible:true};
+  dispatch({kind:'inklayeradd',layer}); activeInkLayer=layer.id;
+}
+function inkLayerDel(id){
+  if(!selCanEdit())return;
+  if((STATE.inkLayers||[]).length<=1){setStatus('Debe quedar al menos una capa.');return;}
+  if(activeInkLayer===id)activeInkLayer=null;
+  dispatch({kind:'inklayerdel',layerId:id});
+}
+function inkLayerVis(id){ if(selCanEdit())dispatch({kind:'inklayervis',layerId:id}); }
+function inkLayerClear(id){ if(selCanEdit())dispatch({kind:'inklayerclear',layerId:id}); }
+function inkLayerRename(id,name){ dispatch({kind:'inklayerrename',layerId:id,name:String(name||'').trim()||'Capa'}); }
+function renderLayerBar(){
+  const bar=document.getElementById('layerBar'); if(!bar)return;
+  const gm=(ME.isHost||!ME.peer), ls=STATE.inkLayers||[], activeId=curInkLayerId();
+  bar.innerHTML=ls.map(L=>{
+    const sel=L.id===activeId;
+    return '<span class="xs'+(sel?' on':'')+'" style="display:inline-flex;align-items:center;gap:3px;padding:2px 4px" '
+      +'onclick="setActiveInkLayer(\''+L.id+'\')" title="dibujar en esta capa">'
+      +(gm?'<span onclick="event.stopPropagation();inkLayerVis(\''+L.id+'\')" title="mostrar/ocultar para todos" style="cursor:pointer">'+(L.visible?'👁':'🚫')+'</span>':(L.visible?'':'🚫'))
+      +'<input value="'+esc(L.name)+'" title="renombrar capa" style="width:64px;font-size:11px;background:none;border:none;color:inherit" '
+      +'onclick="event.stopPropagation()" onchange="inkLayerRename(\''+L.id+'\',this.value)">'
+      +(gm?'<span onclick="event.stopPropagation();inkLayerClear(\''+L.id+'\')" title="borrar los trazos de esta capa" style="cursor:pointer">⌫</span>':'')
+      +(gm&&ls.length>1?'<span onclick="event.stopPropagation();inkLayerDel(\''+L.id+'\')" title="eliminar esta capa" style="cursor:pointer">✕</span>':'')
+      +'</span>';
+  }).join('')+(gm&&ls.length<8?'<button class="xs" onclick="inkLayerAdd()" title="agregar capa">+ capa</button>':'');
+}
 function renderStrokes(){
   const layer=document.getElementById('ink'); if(!layer)return; const {cols,rows,cell}=STATE.grid;
   const W=cols*cell,H=rows*cell; const active=(mapMode==='draw'||mapMode==='erase-stroke');
   layer.style.cssText='position:absolute;left:0;top:0;width:'+W+'px;height:'+H+'px;z-index:'+(active?6:2)+';pointer-events:'+(active?'auto':'none');
+  const layersMap={}; (STATE.inkLayers||[]).forEach(l=>layersMap[l.id]=l);
+  const defLid=(STATE.inkLayers&&STATE.inkLayers[0]&&STATE.inkLayers[0].id)||'L1';
   let svg='<svg id="inksvg" width="'+W+'" height="'+H+'" style="position:absolute;left:0;top:0;overflow:visible">';
   (STATE.strokes||[]).forEach(s=>{
+    const L=layersMap[s.layer||defLid]; if(L&&!L.visible)return;   // capa oculta: nadie la ve, ni el GM
     const pts=strokePts(s,cell);
-    svg+='<g><polyline points="'+pts+'" fill="none" stroke="'+s.color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+    svg+='<g><polyline points="'+pts+'" fill="none" stroke="'+s.color+'" stroke-width="'+(s.w||3)+'" stroke-linecap="round" stroke-linejoin="round"/>'
        +'<polyline class="inkhit" data-id="'+s.id+'" points="'+pts+'" fill="none" stroke="rgba(0,0,0,0)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g>';
   });
   svg+='</svg>';
@@ -2671,11 +2800,15 @@ function renderStrokes(){
       else el.style.pointerEvents='none';
     });
   }
+  if(mapMode==='draw')renderLayerBar();
 }
 function setupInk(){
   const layer=document.getElementById('ink'); if(!layer)return;
   const pc=document.getElementById('penColor');
-  if(pc){pc.value=lsGet('hh-pen-color')||'#ffd24a'; pc.oninput=()=>lsSet('hh-pen-color',pc.value);}
+  if(pc){pc.value=lsGet('hh-pen-color')||'#ffd24a'; pc.oninput=()=>{lsSet('hh-pen-color',pc.value); buildInkSwatches();};}
+  buildInkSwatches();
+  const pw=document.getElementById('penWidth');
+  if(pw){pw.value=lsGet('hh-pen-width')||'normal'; pw.onchange=()=>lsSet('hh-pen-width',pw.value);}
   let drawing=null, temp=null;
   function toCell(ev){const r=document.getElementById('grid').getBoundingClientRect(); const {cols,rows,cell}=STATE.grid;
     let x=(ev.clientX-r.left)/(cell*mapZoom), y=(ev.clientY-r.top)/(cell*mapZoom);
@@ -2687,7 +2820,7 @@ function setupInk(){
     drawing=[toCell(e)];
     const svgEl=document.getElementById('inksvg');
     if(svgEl){temp=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-      temp.setAttribute('fill','none'); temp.setAttribute('stroke',penColor()); temp.setAttribute('stroke-width','3');
+      temp.setAttribute('fill','none'); temp.setAttribute('stroke',penColor()); temp.setAttribute('stroke-width',penWidthFor(curPenType()));
       temp.setAttribute('stroke-linecap','round'); temp.setAttribute('stroke-linejoin','round'); svgEl.appendChild(temp);}
   });
   layer.addEventListener('pointermove',e=>{
@@ -2697,7 +2830,7 @@ function setupInk(){
     if(temp)temp.setAttribute('points',strokePts({pts:drawing},STATE.grid.cell));
   });
   function fin(){ if(!drawing)return;
-    if(drawing.length>1)dispatch({kind:'stroke',stroke:{id:rid(6),color:penColor(),owner:ME.id,pts:drawing}});
+    if(drawing.length>1)dispatch({kind:'stroke',stroke:{id:rid(6),color:penColor(),w:penWidthFor(curPenType()),owner:ME.id,pts:drawing,layer:curInkLayerId()}});
     else renderStrokes();
     drawing=null; temp=null; window.__inkDrawing=false; }
   layer.addEventListener('pointerup',fin); layer.addEventListener('pointercancel',fin);
@@ -2919,7 +3052,7 @@ function rollDuality(cidArg,traitArg,extraMod,opts){
   const tmod=(trait==='0'||!ch)?0:(ch[trait]||0);
   const omod=+extraMod||0;
   const as=window.__advState||0; let advDie=0;
-  if(as){advDie=rollDie(6)*as; window.__advState=0; setTimeout(updateAdvBtns,50);}
+  if(as){advDie=rollDie(6)*as; window.__advState=0; setTimeout(renderDiceCircleSVG,50);}
   const hope=rollDie(12),fear=rollDie(12);
   const total=hope+fear+tmod+omod+advDie;
   let outcome,oclass,hopeDelta=0,fearDelta=0,stressClear=false;
@@ -2927,7 +3060,10 @@ function rollDuality(cidArg,traitArg,extraMod,opts){
   else{const withHope=hope>fear;
     outcome=withHope?'with HOPE':'with FEAR'; oclass=withHope?'hope':'fear';
     if(withHope)hopeDelta=1; else fearDelta=1;}
-  if(opts.noEcon){hopeDelta=0;fearDelta=0;stressClear=false;}
+  /* Un crítico siempre da 1 Esperanza y libera 1 Estrés, incluso en tiradas "sin
+     economía" (reacciones) — esa regla es aparte de si la tirada normalmente
+     reparte Esperanza/Miedo. noEcon sólo apaga el caso no-crítico. */
+  if(opts.noEcon&&oclass!=='crit'){hopeDelta=0;fearDelta=0;stressClear=false;}
   let target=null;
   if(opts.attack){const ti=getTargetInfo(); if(ti)target={name:ti.name,def:ti.def,hit:total>=ti.def};}
   const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:advDie,total,diff:null,outcome,oclass,label:opts.label||'',noEcon:!!opts.noEcon,target};
@@ -2963,38 +3099,205 @@ function animateDice(scope){
 /* ===== dice pool + physical tray + quick actions ===== */
 const DIE_TYPES=[4,6,8,10,12,20,100];
 window.__pool={};
-function buildDieShelf(){const s=document.getElementById('dieShelf'); if(!s||s.children.length)return;
-  DIE_TYPES.forEach(n=>{const b=document.createElement('button'); b.className='dieBtn shape'+n; b.textContent='d'+n;
-    b.title='add a d'+n+' to the pool'; b.onclick=()=>addDie(n); s.appendChild(b);});}
-function addDie(s){window.__pool[s]=(window.__pool[s]||0)+1; renderPoolView();}
-function subDie(s){if(window.__pool[s]){window.__pool[s]--; if(!window.__pool[s])delete window.__pool[s];} renderPoolView();}
-function clearPool(){window.__pool={}; renderPoolView();}
-function renderPoolView(){const v=document.getElementById('poolView'); if(!v)return;
-  const parts=DIE_TYPES.filter(s=>window.__pool[s]).map(s=>'<span class="pill poolchip" onclick="subDie('+s+')" title="click to remove one">'+window.__pool[s]+'×d'+s+'</span>');
-  v.innerHTML=parts.join(' ')||'<span class="muted" style="font-size:12px">click dice to build your roll</span>';}
+/* ============ RUEDA DE DADOS (v12, sacada del VTT de Fonz) ============
+   Geometría SVG pura: cada anillo se dibuja como una serie de "wedges"
+   (gajos) entre dos radios y dos ángulos. Nada de esto toca el estado del
+   pool — sólo lee window.__pool/__poolMod/__advState/__traitSel/__dualitySelected,
+   que son los mismos que ya usaba la barra de dados plana. */
+const DICE_CX=260, DICE_CY=260;
+function polygonPoints(cx,cy,r,sides,rotationDeg){
+  const pts=[];
+  for(let i=0;i<sides;i++){const ang=(rotationDeg+i*360/sides)*Math.PI/180;
+    pts.push((cx+r*Math.sin(ang)).toFixed(1)+','+(cy-r*Math.cos(ang)).toFixed(1));}
+  return pts.join(' ');
+}
+function diceShapeSVG(sides,cx,cy,r,fill){
+  const cfg={4:{n:3,rot:0},6:{n:4,rot:45},8:{n:4,rot:0},10:{n:5,rot:0},12:{n:6,rot:30},20:{n:8,rot:22.5}};
+  const c=cfg[sides];
+  if(!c)return '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r+'" fill="'+fill+'" style="pointer-events:none"/>';
+  return '<polygon points="'+polygonPoints(cx,cy,r,c.n,c.rot)+'" fill="'+fill+'" style="pointer-events:none"/>';
+}
+function polarXY(r,angleDeg){const rad=angleDeg*Math.PI/180; return [DICE_CX+r*Math.sin(rad), DICE_CY-r*Math.cos(rad)];}
+let __arcIdCounter=0;
+function arcPathD(r,a1,a2,flip){
+  const large=(a2-a1)>180?1:0;
+  if(!flip){const [x1,y1]=polarXY(r,a1),[x2,y2]=polarXY(r,a2);
+    return 'M'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+r+','+r+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2);}
+  const [x1,y1]=polarXY(r,a2),[x2,y2]=polarXY(r,a1);
+  return 'M'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+r+','+r+' 0 '+large+' 0 '+x2.toFixed(2)+','+y2.toFixed(2);
+}
+function curvedLabel(r,a1,a2,label,cls,fontSize,fill){
+  const mid=(a1+a2)/2, flip=mid>90&&mid<270, id='arcp'+(__arcIdCounter++);
+  const d=arcPathD(r,a1+2,a2-2,flip);
+  return '<path id="'+id+'" d="'+d+'" fill="none" stroke="none"/>'
+    +'<text class="'+cls+'"'+(fill?' fill="'+fill+'"':'')+' font-size="'+fontSize+'"><textPath href="#'+id+'" xlink:href="#'+id+'" startOffset="50%" text-anchor="middle">'+esc(label)+'</textPath></text>';
+}
+function wedgePath(rIn,rOut,a1,a2){
+  const large=(a2-a1)>180?1:0;
+  const [x1,y1]=polarXY(rOut,a1), [x2,y2]=polarXY(rOut,a2);
+  const [x3,y3]=polarXY(rIn,a2), [x4,y4]=polarXY(rIn,a1);
+  return 'M'+x1.toFixed(2)+','+y1.toFixed(2)+' A'+rOut+','+rOut+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)
+    +' L'+x3.toFixed(2)+','+y3.toFixed(2)+' A'+rIn+','+rIn+' 0 '+large+' 0 '+x4.toFixed(2)+','+y4.toFixed(2)+' Z';
+}
+function wedgeLabelPos(rIn,rOut,a1,a2){ return polarXY((rIn+rOut)/2,(a1+a2)/2); }
+function renderDiceRing1(){
+  const adv=window.__advState||0;
+  const POS_COLOR='#5f7a5f', NEG_COLOR='#7a4f4f';
+  const items=[
+    {a1:-30,a2:30,label:'Limpiar',color:'#5f6b64',onclick:'clearPool()',title:'vaciar el pool de dados'},
+    {a1:30,a2:90,label:'+',color:POS_COLOR,onclick:'adjPoolMod(1)',title:'subir el modificador en 1',big:true},
+    {a1:90,a2:150,label:'▲ Vent',color:POS_COLOR,onclick:'tgAdv(1)',title:'ventaja: +d6 en tu próxima tirada de Dualidad (RAW)',selected:adv===1},
+    {a1:150,a2:210,label:'🎲 Tirar',color:'#d6a64a',onclick:'rollPool()',title:'tirar el pool de dados',big:true,dark:true},
+    {a1:210,a2:270,label:'▼ Desv',color:NEG_COLOR,onclick:'tgAdv(-1)',title:'desventaja: −d6 en tu próxima tirada de Dualidad (RAW)',selected:adv===-1},
+    {a1:270,a2:330,label:'−',color:NEG_COLOR,onclick:'adjPoolMod(-1)',title:'bajar el modificador en 1',big:true},
+  ];
+  const rIn=108,rOut=140; let h=''; const midR=(rIn+rOut)/2;
+  items.forEach(it=>{
+    const d=wedgePath(rIn,rOut,it.a1,it.a2);
+    h+='<path class="wedge'+(it.selected?' selected':'')+'" d="'+d+'" fill="'+it.color+'" onclick="'+it.onclick+'"><title>'+it.title+'</title></path>'
+      +curvedLabel(midR,it.a1,it.a2,it.label,'wedgeLabel'+(it.dark?'':' light'),it.big?13:11);
+  });
+  return h;
+}
+function renderDiceRing2(){
+  window.__pool=window.__pool||{};
+  const order=[
+    {type:'duality'},
+    {d:20,color:'#e08a2e',dark:true},{d:12,color:'#e8c93a',dark:true},{d:10,color:'#f0f0ec',dark:true},
+    {d:8,color:'#3a7fd9',dark:false},{d:6,color:'#e0483a',dark:false},{d:4,color:'#3ea65a',dark:false},{d:100,color:'#9b59b6',dark:false},
+  ];
+  const rIn=142,rOut=205,tokenR=19; let h='';
+  order.forEach((o,i)=>{
+    const a1=i*45-22.5, a2=i*45+22.5;
+    const d=wedgePath(rIn,rOut,a1,a2);
+    const [lx,ly]=wedgeLabelPos(rIn,rOut,a1,a2); const iy=ly-6;
+    const n=o.type==='duality'?0:(window.__pool[o.d]||0);
+    h+='<path class="wedge'+(o.type==='duality'&&window.__dualitySelected?' selected':(n?' selected':''))+'" d="'+d+'" fill="var(--panel2)" onclick="'+(o.type==='duality'?'tgDuality()':'addDie('+o.d+')')+'" '+(o.type==='duality'?'':'oncontextmenu="event.preventDefault();subDie('+o.d+')"')+'><title>'+(o.type==='duality'?'tira Esperanza y Miedo + modificadores (selecciona y luego pulsa Tirar)':'agrega un d'+o.d+' al pool — clic derecho para quitar uno')+'</title></path>';
+    if(o.type==='duality'){
+      h+=diceShapeSVG(12,lx-9,iy,tokenR,'#e0483a')+diceShapeSVG(12,lx+9,iy,tokenR,'#f0f0ec')
+        +'<text style="pointer-events:none" x="'+(lx+9).toFixed(1)+'" y="'+iy.toFixed(1)+'" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="700" fill="#12140f">D</text>';
+    } else {
+      h+=diceShapeSVG(o.d,lx,iy,tokenR+3,o.color)
+        +'<text class="wedgeLabel'+(o.dark?'':' light')+'" x="'+lx.toFixed(1)+'" y="'+iy.toFixed(1)+'" font-size="11" style="pointer-events:none">d'+o.d+'</text>'
+        +(n?'<text class="wedgeLabel light" x="'+lx.toFixed(1)+'" y="'+(iy+29).toFixed(1)+'" font-size="12" style="pointer-events:none">×'+n+'</text>':'');
+    }
+  });
+  return h;
+}
+const RING3_SAVE_COLOR='#5c5c54', RING3_CHECK_COLOR='#d8d0bc';
+function renderDiceRing3(mineC){
+  const rIn=208,rOut=233; let h=''; const midR=(rIn+rOut)/2;
+  const rightStarts=[0,30,60,90,120,150], leftStarts=[330,300,270,240,210,180];
+  const traitSel=window.__traitSel||[];
+  TRAITS.forEach((t,i)=>{
+    const a1=rightStarts[i],a2=a1+30; const d=wedgePath(rIn,rOut,a1,a2);
+    const sel=mineC&&traitSel.includes(t);
+    const modTxt=mineC?((mineC[t]>=0?'+':'')+mineC[t]):'';
+    const label=cap(t).slice(0,3)+(modTxt?' '+modTxt:'');
+    h+='<path class="wedge'+(sel?' selected':'')+'" d="'+d+'" fill="'+RING3_CHECK_COLOR+'" onclick="tgTrait(\''+t+'\')"><title>Chequeo de Habilidad — agrega '+cap(t)+' como modificador</title></path>'
+      +curvedLabel(midR,a1,a2,label,'wedgeLabel',12);
+  });
+  TRAITS.forEach((t,i)=>{
+    const a1=leftStarts[i],a2=a1+30; const d=wedgePath(rIn,rOut,a1,a2);
+    const modTxt=mineC?((mineC[t]>=0?'+':'')+mineC[t]):'';
+    const label=cap(t).slice(0,3)+(modTxt?' '+modTxt:'');
+    h+='<path class="wedge'+(mineC?'':' disabled')+'" d="'+d+'" fill="'+RING3_SAVE_COLOR+'" '+(mineC?('onclick="rollReaction(\''+mineC.id+'\',\''+t+'\',\'Save\')"'):'')+'><title>Salvación — tirada de reacción, sin Esperanza/Miedo (RAW)</title></path>'
+      +curvedLabel(midR,a1,a2,label,'wedgeLabel light',12);
+  });
+  return h;
+}
+function renderDiceLegends(){
+  const r=233+16;
+  return curvedLabel(r,50,130,'Chequeo','wedgeLegend',11)+curvedLabel(r,230,310,'Salvación','wedgeLegend',11);
+}
+function renderDiceCenterMod(){
+  const mod=window.__poolMod||0;
+  return curvedLabel(92,-36,36,'MOD '+(mod>=0?'+':'')+mod,'wedgeLabel light dcModArc',12);
+}
+function renderDiceCircleSVG(){
+  const svg=document.getElementById('diceCircleSvg'); if(!svg)return;
+  const mineC=Object.values(STATE.characters).find(c=>c.owner===ME.id);
+  svg.innerHTML=renderDiceRing3(mineC)+renderDiceRing2()+renderDiceRing1()+renderDiceLegends()+renderDiceCenterMod();
+}
+function adjPoolMod(delta){window.__poolMod=(window.__poolMod||0)+delta; renderDiceCircleSVG();}
+function renderDicePoolPreview(){
+  const prev=document.getElementById('dcPoolPreview'), res=document.getElementById('diceCenterResult');
+  if(!prev)return;
+  window.__pool=window.__pool||{};
+  const parts=DIE_TYPES.filter(s=>window.__pool[s]).map(s=>window.__pool[s]+'d'+s);
+  prev.textContent=parts.length?parts.join(' + '):'sin dados seleccionados';
+  prev.style.display=''; if(res)res.style.display='none';
+}
+/* Resultado en el centro de la rueda: además del toast global (showRollToast,
+   que sigue andando para que se note aunque no estés en la pestaña Dice),
+   esto muestra el detalle con los dados físicos cayendo. */
+function updateDiceCenter(roll){
+  const el=document.getElementById('diceCenterResult'); if(!el||!roll)return;
+  const prev=document.getElementById('dcPoolPreview'); if(prev)prev.style.display='none';
+  el.style.display='';
+  const tgtLine=roll.target?('<div class="dcOutcome '+(roll.target.hit?'hope':'fail')+'">'+(roll.target.hit?'✅ ACIERTO':'❌ FALLA')+' vs '+esc(roll.target.name)+'</div>'):'';
+  if(roll.kind==='pool'){
+    el.innerHTML=(roll.label?'<div class="dcLabel">'+esc(roll.label)+'</div>':'')
+      +'<div class="dcTotal">'+roll.total+'</div>'
+      +'<div class="row" id="dcTrayDice" style="gap:5px;justify-content:center;flex-wrap:wrap;margin-top:6px"></div>'
+      +tgtLine;
+    const tray=document.getElementById('dcTrayDice');
+    (roll.dice||[]).forEach(d=>{const dEl=document.createElement('div'); dEl.className='diephys shape'+d.s; dEl.dataset.final=d.v; dEl.dataset.sides=d.s; dEl.textContent=d.v; tray.appendChild(dEl);});
+    physAnimate(tray);
+  } else {
+    const hopeDEl=document.createElement('div'); hopeDEl.className='die hope'; hopeDEl.dataset.final=roll.hope; hopeDEl.dataset.sides=12; hopeDEl.textContent=roll.hope;
+    const fearDEl=document.createElement('div'); fearDEl.className='die fear'; fearDEl.dataset.final=roll.fear; fearDEl.dataset.sides=12; fearDEl.textContent=roll.fear;
+    el.innerHTML=(roll.label?'<div class="dcLabel">'+esc(roll.label)+'</div>':'')
+      +'<div class="dcTotal">'+roll.total+'</div>'
+      +'<div class="row" id="dcTrayDice" style="gap:6px;justify-content:center;align-items:flex-end;margin-top:6px"></div>'
+      +'<div class="dcOutcome '+roll.oclass+'">'+roll.outcome+'</div>'+tgtLine;
+    const tray=document.getElementById('dcTrayDice');
+    tray.appendChild(hopeDEl); tray.appendChild(fearDEl);
+    if(roll.adv){
+      const advDEl=document.createElement('div'); advDEl.className='diephys shape6';
+      advDEl.dataset.final=Math.abs(roll.adv); advDEl.dataset.sides=6; advDEl.textContent=Math.abs(roll.adv);
+      if(roll.adv<0)advDEl.style.filter='hue-rotate(180deg)';
+      tray.appendChild(advDEl);
+    }
+    animateDice(el);
+    const advEls=tray.querySelectorAll('.diephys'); if(advEls.length)physAnimate(tray);
+  }
+}
+/* ============ estado del pool — mismas funciones de siempre, ahora repintan
+   la rueda en vez de la barra plana ============ */
+function addDie(s){window.__pool[s]=(window.__pool[s]||0)+1; renderDiceCircleSVG(); renderDicePoolPreview();}
+function subDie(s){if(window.__pool[s]){window.__pool[s]--; if(!window.__pool[s])delete window.__pool[s];} renderDiceCircleSVG(); renderDicePoolPreview();}
+function clearPool(){
+  window.__pool={}; window.__poolMod=0; window.__advState=0; window.__dualitySelected=false;
+  renderDiceCircleSVG(); renderDicePoolPreview();
+}
 function rollPool(){
   const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
   const mult=(window.__profMult&&mine)?(mine.proficiency||1):1;
   const tm=mine?selTraitMod(mine):0;
-  const mod=(+val('poolMod')||0)+tm;
+  const as=window.__advState||0; let advDie=0;
+  if(as){advDie=rollDie(6)*as; window.__advState=0; renderDiceCircleSVG();}
+  const mod=(window.__poolMod||0)+tm+advDie;
+  const traitLbl=(window.__traitSel||[]).length&&mine?window.__traitSel.map(t=>cap(t).slice(0,3)).join('+'):'';
+  if(window.__dualitySelected){
+    window.__dualitySelected=false;
+    const label=[traitLbl,(window.__poolMod||0)?'mod '+(window.__poolMod>=0?'+':'')+window.__poolMod:'',
+      advDie?(advDie>0?'Vent +':'Desv −')+Math.abs(advDie):''].filter(Boolean).join(' · ');
+    rollDuality(mine?mine.id:null,'0',mod,{label:label||undefined});
+    return;
+  }
   const dice=[]; DIE_TYPES.forEach(s=>{for(let i=0;i<(window.__pool[s]||0)*mult;i++)dice.push({s,v:rollDie(s)});});
-  if(!dice.length){flash('Add some dice first.');return;}
-  const lbl=[(mult>1?'×'+mult+' Prof':''),(((window.__traitSel||[]).length&&mine)?window.__traitSel.map(t=>cap(t).slice(0,3)).join('+'):'')].filter(Boolean).join(' · ');
+  if(!dice.length){setStatus('Agrega dados primero.');return;}
+  const lbl=[mult>1?'×'+mult+' Prof':'',traitLbl,
+    (window.__poolMod||0)?'mod '+(window.__poolMod>=0?'+':'')+window.__poolMod:'',
+    advDie?(advDie>0?'Vent +':'Desv −')+Math.abs(advDie):''].filter(Boolean).join(' · ');
   finishPool(mine?mine.name:ME.name,dice,mod,lbl);
 }
 function tgTrait(t){const s=window.__traitSel=window.__traitSel||[]; const i=s.indexOf(t); if(i>=0)s.splice(i,1); else s.push(t); renderQuickActions();}
 function selTraitMod(ch){return (window.__traitSel||[]).reduce((a,t)=>a+(ch[t]||0),0);}
-function dualityPool(){
-  const mine=Object.values(STATE.characters).find(c=>c.owner===ME.id);
-  const tm=mine?selTraitMod(mine):0;
-  rollDuality(mine?mine.id:null,'0',(+val('poolMod')||0)+tm);
-}
-
-function tgAdv(v){window.__advState=(window.__advState===v?0:v); updateAdvBtns();
-  if(window.__advState)flash(window.__advState>0?'Advantage armed: +d6 on your next duality roll':'Disadvantage armed: −d6 on your next duality roll');}
-function updateAdvBtns(){const a=document.getElementById('advBtn'),d=document.getElementById('disBtn');
-  if(a){a.style.background=window.__advState===1?'var(--ok)':''; a.style.color=window.__advState===1?'#08140b':''; a.style.fontWeight=window.__advState===1?'700':'';}
-  if(d){d.style.background=window.__advState===-1?'var(--crimson)':''; d.style.color=window.__advState===-1?'#fff':''; d.style.fontWeight=window.__advState===-1?'700':'';}}
+function tgDuality(){window.__dualitySelected=!window.__dualitySelected; renderDiceCircleSVG();}
+function tgAdv(v){window.__advState=(window.__advState===v?0:v); renderDiceCircleSVG();
+  if(window.__advState)setStatus(window.__advState>0?'Ventaja armada: +d6 en tu próxima tirada de Dualidad':'Desventaja armada: −d6 en tu próxima tirada de Dualidad');}
 function qaSpellcast(chId){const ch=STATE.characters[chId]; if(!ch)return;
   const cls=SRD.classes[ch.cls]; const sub=cls?cls.subclasses.find(s=>s.name===ch.subclass):null;
   const trait=(sub&&sub.spellcast?sub.spellcast:'').toLowerCase(); if(!trait){flash('No Domain Trait — this subclass does not cast.');return;}
@@ -3013,7 +3316,7 @@ function rerollDual(which){
   let outcome,oclass,hd=0,fd=0,sc=false;
   if(hope===fear){outcome='CRITICAL SUCCESS!';oclass='crit';hd=1;sc=true;}
   else{const wh=hope>fear; outcome=wh?'with HOPE':'with FEAR'; oclass=wh?'hope':'fear'; if(wh)hd=1; else fd=1;}
-  if(c.noEcon){hd=0;fd=0;sc=false;}
+  if(c.noEcon&&oclass!=='crit'){hd=0;fd=0;sc=false;}   // mismo criterio que rollDuality: el crítico siempre paga
   let target=null; if(c.tgtDef!=null&&c.tgtDef!==undefined)target={name:c.tgtName,def:c.tgtDef,hit:total>=c.tgtDef};
   const ch=c.cid?STATE.characters[c.cid]:null;
   const roll={id:rid(6),roller:o.roller,hope,fear,adv:o.adv||0,total,diff:null,outcome,oclass,label:c.label||'',noEcon:!!c.noEcon,target};
@@ -3091,15 +3394,13 @@ function rollWeaponDmg(chId,slot){
 
 function renderQuickActions(){
   const box=document.getElementById('qaList'); if(!box)return;
-  buildDieShelf(); renderPoolView();
   const mineC=Object.values(STATE.characters).find(c=>c.owner===ME.id);
-  const tc=document.getElementById('traitChips');
-  if(tc){ window.__traitSel=window.__traitSel||[];
-    tc.innerHTML = mineC ? TRAITS.map(t=>'<button class="xs '+(window.__traitSel.includes(t)?'primary':'')+'" onclick="tgTrait(\''+t+'\')" title="add '+cap(t)+' as a modifier">'+cap(t).slice(0,3)+' '+(mineC[t]>=0?'+':'')+mineC[t]+'</button>').join(' ')
-      +' <button class="xs '+(window.__profMult?'primary':'')+'" onclick="window.__profMult=!window.__profMult;renderQuickActions()" title="multiply pool dice count by your Proficiency">×Prof '+(mineC.proficiency||1)+'</button>'
-    : '<span class="muted" style="font-size:11px">no character — flat rolls only</span>'; }
-  const sb=document.getElementById('saveBtns');
-  if(sb)sb.innerHTML=mineC?TRAITS.map(t=>'<button class="xs" onclick="rollReaction(\''+mineC.id+'\',\''+t+'\',\'Save\')">'+cap(t).slice(0,3)+' '+(mineC[t]>=0?'+':'')+mineC[t]+'</button>').join(' '):'<span class="muted" style="font-size:11px">no character</span>';
+  window.__traitSel=window.__traitSel||[];
+  // La rueda reemplaza traitChips y saveBtns (ring3: derecha=Chequeo, izquierda=Salvación);
+  // sólo queda ×Prof, que no tiene un gajo propio en la rueda.
+  renderDiceCircleSVG(); renderDicePoolPreview();
+  const pr=document.getElementById('diceProfRow');
+  if(pr)pr.innerHTML=mineC?'<button class="xs '+(window.__profMult?'primary':'')+'" onclick="window.__profMult=!window.__profMult;renderQuickActions()" title="multiplica la cantidad de dados del pool por tu Competencia">×Prof '+(mineC.proficiency||1)+'</button>':'<span class="muted" style="font-size:11px">sin personaje — sólo tiradas planas</span>';
   const q=s=>String(s).replace(/\\/g,'').replace(/'/g,"\\'");
   let h='';
   Object.values(STATE.characters).filter(c=>c.owner===ME.id).forEach(ch=>{
@@ -3132,7 +3433,7 @@ function renderQuickActions(){
 }
 
 function rollPlain(){const spec=askText('Dice (e.g. 2d6+1, d20):','d12'); if(!spec)return;
-  const m=spec.replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i); if(!m){alert('format like 2d6+1');return;}
+  const m=spec.replace(/\s/g,'').match(/^(\d*)d(\d+)([+-]\d+)?$/i); if(!m){setStatus('format like 2d6+1');return;}
   const n=+(m[1]||1),sides=+m[2],mod=+(m[3]||0); let rolls=[],sum=mod; for(let i=0;i<n;i++){const x=rollDie(sides);rolls.push(x);sum+=x;}
   dispatch({kind:'log',entry:{id:rid(6),who:ME.name,text:`rolls ${spec} → [${rolls.join(', ')}]${mod?(mod>0?'+'+mod:mod):''} = ${sum}`}});}
 function buildQuickDice(){const q=document.getElementById('quickdice'); if(!q)return; q.innerHTML='';
@@ -3324,7 +3625,9 @@ function cap(s){return s[0].toUpperCase()+s.slice(1);}
 function val(id){const e=document.getElementById(id); return e?e.value:'';}
 function setVal(id,v){const e=document.getElementById(id); if(e)e.value=v==null?'':v;}
 function valOr(id,d){const e=document.getElementById(id); return e?e.value:d;}
-function flash(msg){const t=document.getElementById('rolltoast'); t.innerHTML=`<div class="muted">${esc(msg)}</div>`; t.classList.add('show'); clearTimeout(window.__toastT); window.__toastT=setTimeout(()=>t.classList.remove('show'),1600);}
+/* Sebas pidió quitar los mensajes de alerta (el toast duraba muy poco para leerlo).
+   Se deja la función como no-op en vez de borrar sus ~98 llamadas en el resto del archivo. */
+function flash(msg){}
 function syncCharSelects(){const opts=Object.values(STATE.characters).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   const dc=document.getElementById('d-char'); if(dc){const v=dc.value;dc.innerHTML='<option value="">— no character (GM) —</option>'+opts;dc.value=v||activeCharId()||'';}
   const tc=document.getElementById('t-char'); if(tc)tc.innerHTML='<option value="">— none —</option>'+opts;}
@@ -3333,7 +3636,9 @@ function refreshAll(){
   const ink=document.getElementById('ink'); if(ink&&!ink.__bound){ink.__bound=true; setupInk();}
   const mw=document.getElementById('mapwrap'); if(mw&&!mw.__bound){mw.__bound=true; setupMapNav();}
   renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); buildPalette(); updatePeerCount();
-  if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id; showRollToast(STATE.lastRoll);}
+  if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id;
+    if(activeTab!=='dice')showRollToast(STATE.lastRoll);   // en Dice ya se ve en el centro de la rueda — el toast ahí sobra
+    updateDiceCenter(STATE.lastRoll);}
   autosave();
 }
 function updatePeerCount(){const n=document.getElementById('peerCount'); if(!n)return;
@@ -3751,8 +4056,11 @@ function rollReaction(chId,trait,label){
   const crit=hope===fear;
   const outcome=(label||'Reaction')+' ('+cap(trait)+')'+(crit?' — CRITICAL!':'');
   const oclass=crit?'crit':(hope>fear?'hope':'fear');
-  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:0,total,diff:null,outcome,oclass,noEcon:true,label:label||'Reaction'};
-  dispatch({kind:'roll',entry:{id:roll.id,who:roll.roller,text:(label||'Reaction')+' ('+cap(trait)+'): total '+total+' (Hope '+hope+', Fear '+fear+') — no Hope/Fear (reaction)'},roll,hopeDelta:0,fearDelta:0});
+  const roll={id:rid(6),roller:(ch?ch.name:ME.name),hope,fear,adv:0,total,diff:null,outcome,oclass,noEcon:!crit,label:label||'Reaction'};
+  // Sin economía normal en reacciones (RAW), pero un crítico igual da 1 Esperanza
+  // y libera 1 Estrés — esa parte de la regla no depende de que sea reacción.
+  dispatch({kind:'roll',entry:{id:roll.id,who:roll.roller,text:(label||'Reaction')+' ('+cap(trait)+'): total '+total+' (Hope '+hope+', Fear '+fear+')'+(crit?' — ¡CRÍTICO! gana 1 Esperanza y libera 1 Estrés':' — no Hope/Fear (reaction)')},
+    roll,charId:chId,hopeDelta:crit?1:0,fearDelta:0,stressClear:crit});
 }
 
 function saveSession(){
@@ -3764,16 +4072,16 @@ function saveSession(){
   flash('Session saved to file');
 }
 function loadSession(){
-  if(ME.peer&&!ME.isHost){alert('Only the GM (host) can load a session for the table.');return;}
+  if(ME.peer&&!ME.isHost){setStatus('Only the GM (host) can load a session for the table.');return;}
   const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
   inp.onchange=()=>{const f=inp.files[0]; if(!f)return; const rd=new FileReader();
     rd.onload=()=>{try{
       const data=JSON.parse(rd.result); const st=data.state||data;
-      if(!st.characters||!st.grid){alert('Not a valid HellHeart session file.');return;}
+      if(!st.characters||!st.grid){setStatus('Not a valid HellHeart session file.');return;}
       const pres=STATE.presence; STATE=st; STATE.presence=pres||[]; if(STATE.lastRoll)shownRoll=STATE.lastRoll.id;
       if(ME.isHost)broadcast(); else refreshAll();
       flash('Session loaded'+(data.saved?' ('+data.saved.slice(0,10)+')':''));
-    }catch(e){alert('Could not read file: '+e.message);}};
+    }catch(e){setStatus('Could not read file: '+e.message);}};
     rd.readAsText(f);};
   inp.click();
 }
@@ -3836,7 +4144,7 @@ function applyMapFile(d){
   flash('Map loaded'+(d.name?': '+d.name:'')+(skipped?' ('+skipped+' invalid entries skipped)':''));
 }
 function loadMap(){
-  if(ME.peer&&!ME.isHost){alert('Only the GM (host) can load a map for the table.');return;}
+  if(ME.peer&&!ME.isHost){setStatus('Only the GM (host) can load a map for the table.');return;}
   const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
   inp.onchange=()=>{const f=inp.files[0]; if(!f)return; const rd=new FileReader();
     rd.onload=()=>{try{
@@ -3850,10 +4158,10 @@ function loadMap(){
         applyFloorsFile({floors:data.state.floors,floorIdx:data.state.floorIdx,tokens:data.state.tokens}); return;
       }
       const d=data.state?{name:data.name,grid:data.state.grid,tiles:data.state.tiles,edges:data.state.edges,strokes:data.state.strokes}:data;
-      const err=validateMapData(d); if(err){alert('Not a valid map file: '+err);return;}
+      const err=validateMapData(d); if(err){setStatus('Not a valid map file: '+err);return;}
       if(Object.keys(STATE.tiles||{}).length&&!okDouble('loadmap','Reemplazar el mapa actual (personajes y fichas se mantienen).'))return;
       applyMapFile(d);
-    }catch(e){alert('Could not read file: '+e.message);}};
+    }catch(e){setStatus('Could not read file: '+e.message);}};
     rd.readAsText(f);};
   inp.click();
 }
@@ -4247,6 +4555,17 @@ function applyMapSkin(){
   const w=document.getElementById('mapwrap'); if(w)w.classList.toggle('paper',mapSkin==='paper');
   const b=document.getElementById('skinBtn'); if(b)b.textContent=(mapSkin==='paper')?'🗺 papel':'🌑 oscuro';
 }
+/* Grilla de referencia opcional — sacada del "grid toggle" del VTT de Fonz. Preferencia
+   personal (como el skin o el zoom): no se sincroniza con la mesa. */
+function toggleGridOverlay(){
+  gridOverlay=!gridOverlay;
+  try{lsSet('ph-grid-overlay',gridOverlay?'1':'0');}catch(e){}
+  applyGridOverlay();
+}
+function applyGridOverlay(){
+  const w=document.getElementById('mapwrap'); if(w)w.classList.toggle('gridoverlay',gridOverlay);
+  const b=document.getElementById('gridOverlayBtn'); if(b)b.classList.toggle('primary',gridOverlay);
+}
 
 /* ================= AREA SELECTION (rect / circle / lasso) — top-down 2D =================
    State (selShape / SEL / selDrag) is declared with the other map globals near the top,
@@ -4254,14 +4573,15 @@ function applyMapSkin(){
 function setSelShape(s){
   selShape=s;
   /* «muros» edita bordes, así que por dentro cambia el modo — pero para el usuario
-     sigue siendo Dibujo, y la barra lo refleja así. */
+     sigue siendo Dibujo, y la barra lo refleja así. Si ya estábamos en Niebla, las
+     demás formas (rect/círculo/lazo) se quedan en Niebla — no saltan de vuelta a Dibujo. */
   const sh=SHAPES.find(x=>x.id===s);
-  mapMode = sh&&sh.edges ? 'edges' : 'paint';
+  mapMode = sh&&sh.edges ? 'edges' : (mapMode==='fog'?'fog':'paint');
   const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
   show('edgehint', mapMode==='edges');
   show('tilewrap', mapMode==='paint');          // con muros no se elige casilla
   const mw=document.getElementById('mapwrap');
-  if(mw)mw.classList.toggle('selmode',mapMode==='paint'&&s!=='free');
+  if(mw)mw.classList.toggle('selmode',(mapMode==='paint'||mapMode==='fog')&&s!=='free');
   buildShapeBar(); buildModeBar(); renderMap();
 }
 function selCanEdit(){return ME.isHost||!ME.peer;}
@@ -4415,6 +4735,15 @@ function applySelection(id){
 }
 function fillSelection(){applySelection(selectedTerrain);}
 function eraseSelection(){applySelection('erase');}
+/* Tapar/liberar con niebla la zona marcada con rect/círculo/lazo, en vez de sólo
+   arrastrar casilla a casilla. Sebas lo pidió porque cubrir salas grandes a mano
+   era lento. */
+function fogSelection(val){
+  if(!selCanEdit()){setStatus('Solo el GM edita la niebla');return;}
+  if(!SEL.size){setStatus('No hay nada seleccionado');return;}
+  const cells=[]; SEL.forEach(k=>{const a=k.split(','); cells.push({r:+a[0],c:+a[1]});});
+  dispatch({kind:'fog',cells,val});
+}
 
 /* ---- pointer handling (bound on #grid; paint/fog/aspect guards keep modes apart) ---- */
 function setupSelect(){
@@ -4422,7 +4751,7 @@ function setupSelect(){
   const pos=ev=>{const r=g.getBoundingClientRect(), u=STATE.grid.cell*mapZoom;
     return [(ev.clientX-r.left)/u,(ev.clientY-r.top)/u];};
   g.addEventListener('pointerdown',e=>{
-    if(mapMode!=='paint'||selShape==='free'||!selCanEdit())return;
+    if((mapMode!=='paint'&&mapMode!=='fog')||selShape==='free'||!selCanEdit())return;
     if(e.button!==0&&e.button!==2)return;
     e.preventDefault(); e.stopPropagation();
     const p=pos(e);
@@ -4444,8 +4773,9 @@ function setupSelect(){
     cells.forEach(rc=>{const k=rc[0]+','+rc[1]; if(d.mode==='sub')SEL.delete(k); else SEL.add(k);});
     updateSelCount(); renderSelection();
     /* Se rellena y la zona SE QUEDA seleccionada: así "agregar pieza" opera sobre lo
-       que acabas de dibujar, sin obligarte a volver a marcarlo. */
-    if(SEL.size&&!d.keep){ if(d.btn===2)eraseSelection(); else fillSelection(); }
+       que acabas de dibujar, sin obligarte a volver a marcarlo. En Niebla no hay un
+       relleno automático — la zona queda marcada para "cubrir"/"revelar" a propósito. */
+    if(SEL.size&&!d.keep&&mapMode==='paint'){ if(d.btn===2)eraseSelection(); else fillSelection(); }
   };
   g.addEventListener('pointerup',fin); g.addEventListener('pointercancel',fin);
 }
