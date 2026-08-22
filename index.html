@@ -147,6 +147,19 @@
   #mapwrap.spacepan{cursor:grab}
   #grid{display:grid;position:relative;background:var(--grid);border:1px solid var(--line)}
   .cell{border:1px solid rgba(255,255,255,.05)}
+  /* Foto de referencia (v13): va detrás de #grid; lo pintado encima la tapa a
+     propósito, lo que queda sin pintar la deja ver — la grilla siempre queda
+     arriba para poder calzarla. Sin esto el fondo decorativo de #grid (sólido en
+     oscuro, rayado de roca en papel) taparía la foto por completo. */
+  #mapbg{position:absolute;left:0;top:0;pointer-events:none}
+  #mapwrap.hasbg #grid{background:none!important}
+  #mapwrap.bgimgmode #mapbg{pointer-events:auto;cursor:move}
+  /* #grid va encima de #mapbg en el apilamiento (aunque su fondo esté apagado por
+     .hasbg) y sus .cell siguen recibiendo clics por defecto — sin esto ningún clic
+     llega nunca a la imagen, así se dibujó pero nunca se pudo arrastrar de verdad. */
+  #mapwrap.bgimgmode #grid{pointer-events:none}
+  #mapbgHandle{position:absolute;width:16px;height:16px;background:var(--gold);border:2px solid #1a1613;border-radius:3px;transform:translate(-50%,-50%);z-index:6}
+  #mapwrap.bgimgmode.hasbg #mapbgHandle{pointer-events:auto;cursor:nwse-resize}
   #edges,#edgehot,#ink,#tokens{position:absolute;inset:0;pointer-events:none}
   #fogcv{position:absolute;left:0;top:0;pointer-events:none;z-index:40}
   #aspects{position:absolute;inset:0;pointer-events:none;z-index:5}
@@ -535,6 +548,18 @@
           <button class="xs" onclick="dispatch({kind:'fogall',val:1})" title="revela todo el piso">⬜ revelar todo</button>
           <span class="muted" style="font-size:11px">Shift+click: toggle una pieza · arrastra para pintar niebla, o marca una zona con rect/círculo/lazo</span>
         </span>
+        <span id="bgimgtools" style="display:none;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="xs" onclick="document.getElementById('bgimgFile').click()">cargar imagen</button>
+          <input type="file" id="bgimgFile" accept="image/*" style="display:none" onchange="bgImgUpload(event)">
+          <span id="bgimgAdjust" style="display:none;gap:6px;align-items:center">
+            <label class="muted" style="font-size:11px">ancho (casillas)</label>
+            <input id="bgimgWidthCells" type="number" min="1" max="200" style="width:56px" onchange="bgImgSetWidthCells(this.value)">
+            <button class="xs" onclick="bgImgNudgeScale(0.95)" title="achicar 5%">−</button>
+            <button class="xs" onclick="bgImgNudgeScale(1.0526)" title="agrandar 5%">+</button>
+            <span class="muted" style="font-size:11px">arrastra la imagen para moverla</span>
+            <button class="xs danger" onclick="bgImgClear()">quitar imagen</button>
+          </span>
+        </span>
         <span class="mtsep"></span>
         <button class="xs" onclick="openToken()">+ token</button>
       </div>
@@ -542,6 +567,8 @@
     <div id="mapbody">
       <div id="mapviewport">
         <div id="mapwrap"><div id="mapsizer"><div id="mapstage">
+          <img id="mapbg" alt="" style="display:none">
+          <div id="mapbgHandle" style="display:none" title="arrastra para escalar (mantiene la proporción)"></div>
           <div id="grid"></div><div id="edges"></div><div id="edgehot"></div><div id="ink"></div><div id="aspects"></div><div id="tokens"></div><canvas id="selov"></canvas><canvas id="fogcv"></canvas>
         </div></div></div>
         <button class="expand t gmonly sm" onclick="expandGrid('top')">▲ double</button>
@@ -970,7 +997,7 @@ catch(e){ LS_OK=false; }
 function lsGet(k){ if(!LS_OK)return null; try{ return localStorage.getItem(k); }catch(e){ LS_OK=false; return null; } }
 function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){ LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v12.2';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v13.6';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1296,28 +1323,29 @@ function playerReceive(d){ if(d.t==='state'){ STATE=d.state;
 function activeFloorId(){return ((STATE.floors||[])[STATE.floorIdx||0]||{}).id||'fl0';}
 function relinkFloor(){const f=(STATE.floors||[])[STATE.floorIdx]; if(!f)return;
   f.grid=STATE.grid; f.tiles=STATE.tiles; f.edges=STATE.edges; f.strokes=STATE.strokes||[]; f.fog=STATE.fog||(STATE.fog={}); f.aspects=STATE.aspects||(STATE.aspects=[]);
-  f.rooms=STATE.rooms||(STATE.rooms=[]); f.inkLayers=STATE.inkLayers||(STATE.inkLayers=[]);}
+  f.rooms=STATE.rooms||(STATE.rooms=[]); f.inkLayers=STATE.inkLayers||(STATE.inkLayers=[]);
+  f.bgImage=(STATE.bgImage!==undefined)?STATE.bgImage:(f.bgImage||null);}
 function normalizeFloors(){
   if(!STATE.floors||!STATE.floors.length){
     STATE.fog=STATE.fog||{};
     STATE.aspects=STATE.aspects||[];
     STATE.rooms=STATE.rooms||[];
     STATE.inkLayers=STATE.inkLayers&&STATE.inkLayers.length?STATE.inkLayers:[{id:'L1',name:'Capa 1',visible:true}];
-    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects,rooms:STATE.rooms,inkLayers:STATE.inkLayers}];
+    STATE.floors=[{id:'fl0',name:'Planta 1',grid:STATE.grid,tiles:STATE.tiles,edges:STATE.edges,strokes:STATE.strokes||[],fog:STATE.fog,aspects:STATE.aspects,rooms:STATE.rooms,inkLayers:STATE.inkLayers,bgImage:STATE.bgImage||null}];
     STATE.floorIdx=0;
   }
   // mapas guardados antes de v7 no traen rooms — dárselo aquí evita comprobarlo en cada uso.
   // Igual para inkLayers (v11): sin capas, los trazos existentes se asignan todos a "Capa 1".
   (STATE.floors||[]).forEach(f=>{ if(!f.rooms)f.rooms=[];
     if(!f.inkLayers||!f.inkLayers.length)f.inkLayers=[{id:'L1',name:'Capa 1',visible:true}];
+    if(f.bgImage===undefined)f.bgImage=null;
     (f.strokes||[]).forEach(s=>{ if(!s.layer)s.layer=f.inkLayers[0].id; }); });
   if(!STATE.rooms)STATE.rooms=[];
   if(STATE.floorIdx==null||STATE.floorIdx<0||STATE.floorIdx>=STATE.floors.length)STATE.floorIdx=0;
-  /* Sólo si STATE.inkLayers nunca se inicializó (campaña guardada antes de v11):
-     toma el default que el forEach de arriba ya armó en la pieza. Si ya existe (caso
-     normal, incluso recién mutado por un dispatch), NO se toca — relinkFloor() de abajo
-     lo empuja hacia la pieza, no al revés; pisarlo aquí perdería ediciones recientes. */
+  /* Mismo criterio que inkLayers: sólo tomar el default de la pieza si STATE.* nunca
+     se inicializó (campaña vieja) — si ya existe, incluso recién mutado, no tocarlo. */
   if(!STATE.inkLayers)STATE.inkLayers=STATE.floors[STATE.floorIdx].inkLayers;
+  if(STATE.bgImage===undefined)STATE.bgImage=STATE.floors[STATE.floorIdx].bgImage;
   relinkFloor();
   const fid=activeFloorId();
   (STATE.tokens||[]).forEach(t=>{if(!t.floor)t.floor=fid;});
@@ -1328,7 +1356,8 @@ function switchFloorLocal(i){
   STATE.floorIdx=i; const f=STATE.floors[i];
   f.grid=f.grid||{cols:21,rows:26,cell:30,scale:5}; f.tiles=f.tiles||{}; f.edges=f.edges||{}; f.strokes=f.strokes||[]; f.fog=f.fog||{}; f.aspects=f.aspects||[]; f.rooms=f.rooms||[];
   f.inkLayers=f.inkLayers&&f.inkLayers.length?f.inkLayers:[{id:'L1',name:'Capa 1',visible:true}];
-  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects; STATE.rooms=f.rooms; STATE.inkLayers=f.inkLayers;
+  if(f.bgImage===undefined)f.bgImage=null;
+  STATE.grid=f.grid; STATE.tiles=f.tiles; STATE.edges=f.edges; STATE.strokes=f.strokes; STATE.fog=f.fog; STATE.aspects=f.aspects; STATE.rooms=f.rooms; STATE.inkLayers=f.inkLayers; STATE.bgImage=f.bgImage;
   selRoom=null; activeInkLayer=null;
 }
 function renderFloorUI(){
@@ -1491,7 +1520,18 @@ function applyFloorsFile(d){
             .map(ft=>({id:rid(4),name:String(ft.name).slice(0,60),cost:Math.max(0,Math.round(+ft.cost)||0),text:String(ft.text||'').slice(0,500)}))}
       };
     });
-    floors.push({id:f.id||rid(4),name:String(f.name||('Piso '+(fi+1))).slice(0,24),grid:g,tiles,edges,strokes,fog:{},aspects,rooms});
+    // imagen de referencia (v13) y capas de tinta (v11): también se perdian al
+    // importar un mapa multi-piso por el mismo motivo que rooms arriba — esta
+    // función nunca las leía.
+    let bgImage=null;
+    if(f.bgImage&&typeof f.bgImage==='object'&&typeof f.bgImage.url==='string'&&f.bgImage.url.slice(0,5)==='data:'){
+      bgImage={url:f.bgImage.url, x:Number(f.bgImage.x)||0, y:Number(f.bgImage.y)||0,
+        w:Math.max(1,Number(f.bgImage.w)||100), h:Math.max(1,Number(f.bgImage.h)||100), ar:Number(f.bgImage.ar)||1};
+    }
+    const inkLayers=(Array.isArray(f.inkLayers)?f.inkLayers:[]).filter(l=>l&&typeof l.id==='string'&&typeof l.name==='string')
+      .map(l=>({id:String(l.id).slice(0,12),name:String(l.name).slice(0,24),visible:l.visible!==false}));
+    floors.push({id:f.id||rid(4),name:String(f.name||('Piso '+(fi+1))).slice(0,24),grid:g,tiles,edges,strokes,fog:{},aspects,rooms,bgImage,
+      inkLayers:inkLayers.length?inkLayers:[{id:'L1',name:'Capa 1',visible:true}]});
   });
   if(!floors.length){setStatus('No valid floors in this file');return;}
   const ids=floors.map(f=>f.id);
@@ -1558,6 +1598,7 @@ function apply(a){
     case 'clearmap':{ STATE.tiles={}; STATE.edges={}; STATE.strokes=[]; STATE.fog={};
       const fid=activeFloorId(); STATE.tokens=(STATE.tokens||[]).filter(t=>t.floor!==fid); relinkFloor(); break;}
     case 'edge': if(a.val)STATE.edges[a.key]=a.val; else delete STATE.edges[a.key]; break;
+    case 'edgesset': (a.edges||[]).forEach(({key,val})=>{if(val)STATE.edges[key]=val; else delete STATE.edges[key];}); break;
     case 'mapset': STATE.grid=a.grid; STATE.tiles=a.tiles; STATE.edges=a.edges; STATE.tokens=a.tokens; if(a.strokes)STATE.strokes=a.strokes; relinkFloor(); break;
     case 'addtoken': if(!a.token.floor)a.token.floor=activeFloorId(); STATE.tokens.push(a.token); break;
     case 'stroke': (STATE.strokes||(STATE.strokes=[])).push(a.stroke); if(STATE.strokes.length>500)STATE.strokes.shift(); break;
@@ -1569,6 +1610,9 @@ function apply(a){
     case 'inklayervis':{ const l=(STATE.inkLayers||[]).find(x=>x.id===a.layerId); if(l)l.visible=!l.visible; break;}
     case 'inklayerclear': STATE.strokes=(STATE.strokes||[]).filter(s=>s.layer!==a.layerId); break;
     case 'inklayerrename':{ const l=(STATE.inkLayers||[]).find(x=>x.id===a.layerId); if(l)l.name=String(a.name||l.name).slice(0,24); break;}
+    /* ---- imagen de referencia (v13) ---- */
+    case 'bgimgset': STATE.bgImage=a.bgImage; break;
+    case 'bgimgclear': STATE.bgImage=null; break;
     case 'movetoken':{const t=STATE.tokens.find(t=>t.id===a.id); if(t){t.r=a.r;t.c=a.c;
       /* Vía 1 de las tres acordadas: pasar al lado revela la puerta secreta. Sólo lo
          evalúa el GM, que es quien tiene el estado bueno, y se difunde a la mesa. */
@@ -2444,9 +2488,11 @@ const HOTKEYS=['1','2','3','4','5','6','7','8','9','0'];
    repetir la misma selecci\u00f3n en cada uno. */
 const MODEBAR=[
   {mode:'paint', icon:'\u25a8', label:'Dibujo',  key:'d', title:'Dibujar el mapa \u2014 elige con qu\u00e9 rellenas y con qu\u00e9 casilla'},
+  {mode:'room',  icon:'\u2b1a', label:'Piezas',  key:'p', title:'Marcar el contorno de una pieza \u2014 junta varias formas para hacer contornos complejos, Alt resta, Esc suelta', gm:true},
   {mode:'fog',   icon:'\u2593', label:'Niebla',  key:'f', title:'Niebla de guerra (GM)', gm:true},
   {mode:'draw',  icon:'\u270e', label:'L\u00e1piz',   key:'l', title:'Trazo libre a mano alzada \u2014 clic der. sobre un trazo lo borra'},
   {mode:'aspect',icon:'\u25c8', label:'Aspects', key:'a', title:'Aspects (GM)', gm:true},
+  {mode:'bgimg', icon:'\ud83d\uddbc', label:'Imagen', key:'i', title:'Foto de referencia debajo de la grilla (GM)', gm:true},
   {mode:'off',   icon:'\u270b', label:'Ver',     key:'v', title:'S\u00f3lo ver y mover fichas'}
 ];
 /* Formas de relleno dentro de Dibujo. \u00ablibre\u00bb es el pintado casilla a casilla de
@@ -2472,30 +2518,32 @@ function setMapMode(m){
   mapMode=m;
   // al entrar en Dibujo desde fuera, arrancar con la última forma que no sea muros
   if(m==='paint'&&!eraDibujo&&SHAPES.find(s=>s.id===selShape&&s.edges))selShape='rect';
-  // la niebla no edita bordes: si venías de Muros, la forma no aplica aquí
-  if(m==='fog'&&selShape==='walls')selShape='rect';
+  // la niebla y las piezas no editan bordes: si venías de Muros, la forma no aplica aquí
+  if((m==='fog'||m==='room')&&selShape==='walls')selShape='rect';
   const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
   const dib=isDrawTool(m);
   show('edgehint', m==='edges');
   show('fogtools', m==='fog','inline-flex');
   show('inkTools', m==='draw','inline-flex');
-  // Niebla también usa el selector rect/círculo/lazo, para tapar o liberar una zona
-  // de una pasada en vez de sólo arrastrar casilla a casilla.
-  show('seltools', dib||m==='fog','inline-flex');
-  show('selAddRoom', dib);
+  show('bgimgtools', m==='bgimg','inline-flex');
+  const mw0=document.getElementById('mapwrap'); if(mw0)mw0.classList.toggle('bgimgmode',m==='bgimg');
+  // Niebla y Piezas también usan el selector rect/círculo/lazo — Niebla para tapar o
+  // liberar una zona de una pasada, Piezas para marcar el contorno de una sala.
+  show('seltools', dib||m==='fog'||m==='room','inline-flex');
+  show('selAddRoom', dib||m==='room');
   show('selErase', dib);
   show('selFogHide', m==='fog');
   show('selFogShow', m==='fog');
   show('tilewrap', m==='paint');
   const tw=document.getElementById('tilewrap'); if(tw&&m==='paint')tw.open=true;
   const ps=document.getElementById('propSel'); if(ps&&m!=='paint')ps.style.display='none';
-  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',(m==='paint'||m==='fog')&&selShape!=='free');
-  if(!dib&&m!=='fog')clearSelection(true);
+  const mw=document.getElementById('mapwrap'); if(mw)mw.classList.toggle('selmode',(m==='paint'||m==='fog'||m==='room')&&selShape!=='free');
+  if(!dib&&m!=='fog'&&m!=='room')clearSelection(true);
   buildPalette(); renderMap();}
 function buildShapeBar(){
   const bar=document.getElementById('shapebar'); if(!bar)return;
-  // Muros es un caso de Dibujo (edita bordes, no casillas) — no aplica en Niebla.
-  const shapes=mapMode==='fog'?SHAPES.filter(s=>!s.edges):SHAPES;
+  // Muros es un caso de Dibujo (edita bordes, no casillas) — no aplica en Niebla ni Piezas.
+  const shapes=(mapMode==='fog'||mapMode==='room')?SHAPES.filter(s=>!s.edges):SHAPES;
   bar.innerHTML=shapes.map(s=>`<button class="xs${s.id===selShape?' on':''}" title="${s.title}" onclick="setSelShape('${s.id}')">${s.icon}</button>`).join('');
 }
 function buildPalette(){
@@ -2571,16 +2619,30 @@ function setupMapNav(){
     if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable))return;
     const pm=document.getElementById('panel-map'); if(!pm||pm.offsetParent===null)return;
     if(e.key===' '){if(!space){space=true; wrap.classList.add('spacepan');} e.preventDefault(); return;}
+    /* En modo Imagen las flechas mueven la foto de a poco (Shift = salto más grande)
+       en vez de desplazar la vista — para el ajuste fino que el arrastre a mano no
+       siempre permite. */
+    if(mapMode==='bgimg'&&STATE.bgImage&&e.key.slice(0,5)==='Arrow'){e.preventDefault();
+      const st=e.shiftKey?10:1;
+      const dx=e.key==='ArrowRight'?st:e.key==='ArrowLeft'?-st:0;
+      const dy=e.key==='ArrowDown'?st:e.key==='ArrowUp'?-st:0;
+      STATE.bgImage.x+=dx; STATE.bgImage.y+=dy;
+      renderBgImg();
+      clearTimeout(window.__bgimgNudgeT);
+      window.__bgimgNudgeT=setTimeout(()=>dispatch({kind:'bgimgset', bgImage:{...STATE.bgImage}}),300);
+      return;}
     if(e.key.slice(0,5)==='Arrow'){e.preventDefault();
       const st=e.shiftKey?180:60;
       const dx=e.key==='ArrowRight'?st:e.key==='ArrowLeft'?-st:0;
       const dy=e.key==='ArrowDown'?st:e.key==='ArrowUp'?-st:0;
       wrap.scrollLeft+=dx; wrap.scrollTop+=dy;
       return;}
-    if((mapMode==='paint'||mapMode==='fog')&&SEL.size){
+    if((mapMode==='paint'||mapMode==='fog'||mapMode==='room')&&SEL.size){
       if(e.key==='Escape'){clearSelection(); e.preventDefault(); return;}
+      if(mapMode==='paint'||mapMode==='room'){
+        if(e.key==='Enter'){roomFromSelection(); e.preventDefault(); return;}   // la zona dibujada (o la suma de varias) → pieza
+      }
       if(mapMode==='paint'){
-        if(e.key==='Enter'){roomFromSelection(); e.preventDefault(); return;}   // la zona dibujada → pieza
         if(e.key==='Delete'||e.key==='Backspace'){eraseSelection(); e.preventDefault(); return;}
       }
     }
@@ -2590,7 +2652,7 @@ function setupMapNav(){
   });
   document.addEventListener('keyup',e=>{if(e.key===' '){space=false; wrap.classList.remove('spacepan');}});
 }
-function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); applyMapSkin(); applyGridOverlay(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); renderRooms(); }
+function renderMap(){ if(painting||window.__dragging||window.__inkDrawing)return; normalizeFloors(); applyMapSkin(); applyGridOverlay(); renderBgImg(); renderGrid(); renderEdges(); renderStrokes(); renderTokens(); renderAspects(); renderFog(); renderFloorUI(); renderSelection(); renderRooms(); }
 /* En un mapa a tinta la elevación no se distingue por color sino por TRAMA, que es
    como se hace a mano: lo hundido se oscurece, lo elevado se raya. Sin esto todos los
    suelos salían del mismo blanco y no se diferenciaba nada. */
@@ -2834,6 +2896,103 @@ function setupInk(){
     else renderStrokes();
     drawing=null; temp=null; window.__inkDrawing=false; }
   layer.addEventListener('pointerup',fin); layer.addEventListener('pointercancel',fin);
+}
+/* ============ IMAGEN DE REFERENCIA (v13) ============
+   Va detrás de #grid (ver CSS #mapbg). Se guarda en STATE.bgImage:
+   {url: data-URL jpeg, x, y, w, h, ar} — x/y/w/h en el mismo espacio de píxeles
+   que las celdas (cell*col), así que se posiciona igual que #grid sin importar
+   el zoom del mapa (que escala #mapstage entero). ar = alto/ancho natural, para
+   poder recalcular el alto al cambiar sólo el ancho en casillas. */
+const BGIMG_MAX_DIM=1600, BGIMG_JPEG_Q=0.75;
+function bgImgUpload(ev){
+  const file=(ev.target.files||[])[0]; ev.target.value='';
+  if(!file)return;
+  if(!selCanEdit()){setStatus('Sólo el GM carga la imagen de referencia.');return;}
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.naturalWidth, h=img.naturalHeight;
+      const scale=Math.min(1, BGIMG_MAX_DIM/Math.max(w,h));
+      w=Math.round(w*scale); h=Math.round(h*scale);
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      const url=cv.toDataURL('image/jpeg',BGIMG_JPEG_Q);
+      if(url.length>1200000)setStatus('La imagen quedó pesada ('+Math.round(url.length/1024)+' KB) — se manda entera con cada sincronización, puede notarse lento en la mesa.');
+      const cell=STATE.grid.cell||30;
+      const dispW=Math.min(20*cell, w);           // arranca calzando ~20 casillas de ancho, sin agrandar si la foto es mas chica
+      const dispH=dispW*(h/w);
+      dispatch({kind:'bgimgset', bgImage:{url, x:0, y:0, w:dispW, h:dispH, ar:h/w}});
+    };
+    img.onerror=()=>setStatus('No se pudo leer esa imagen.');
+    img.src=rd.result;
+  };
+  rd.onerror=()=>setStatus('No se pudo leer ese archivo.');
+  rd.readAsDataURL(file);
+}
+function bgImgClear(){ if(selCanEdit())dispatch({kind:'bgimgclear'}); }
+function bgImgSetWidthCells(n){
+  const bi=STATE.bgImage; if(!bi)return;
+  const cell=STATE.grid.cell||30;
+  const w=Math.max(1,+n||1)*cell, h=w*(bi.ar||1);
+  dispatch({kind:'bgimgset', bgImage:{...bi, w, h}});
+}
+function bgImgNudgeScale(mult){
+  const bi=STATE.bgImage; if(!bi)return;
+  dispatch({kind:'bgimgset', bgImage:{...bi, w:bi.w*mult, h:bi.h*mult}});
+}
+function renderBgImg(){
+  const el=document.getElementById('mapbg'), mw=document.getElementById('mapwrap'), hd=document.getElementById('mapbgHandle');
+  const bi=STATE.bgImage;
+  if(mw)mw.classList.toggle('hasbg',!!bi);
+  const adj=document.getElementById('bgimgAdjust'); if(adj)adj.style.display=bi?'inline-flex':'none';
+  if(!el)return;
+  if(!bi){ el.style.display='none'; el.src=''; if(hd)hd.style.display='none'; return; }
+  if(el.dataset.url!==bi.url){ el.src=bi.url; el.dataset.url=bi.url; }
+  el.style.display=''; el.style.left=bi.x+'px'; el.style.top=bi.y+'px'; el.style.width=bi.w+'px'; el.style.height=bi.h+'px';
+  if(hd){ hd.style.display=''; hd.style.left=(bi.x+bi.w)+'px'; hd.style.top=(bi.y+bi.h)+'px'; }
+  const wc=document.getElementById('bgimgWidthCells');
+  if(wc&&document.activeElement!==wc)wc.value=Math.round(bi.w/(STATE.grid.cell||30));
+}
+function setupBgImg(){
+  const el=document.getElementById('mapbg'), hd=document.getElementById('mapbgHandle'); if(!el)return;
+  let drag=null, rdrag=null;
+  el.addEventListener('pointerdown',e=>{
+    if(mapMode!=='bgimg'||!selCanEdit()||!STATE.bgImage)return;
+    e.preventDefault(); e.stopPropagation();
+    drag={x0:e.clientX,y0:e.clientY,bx:STATE.bgImage.x,by:STATE.bgImage.y};
+    try{el.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    const u=mapZoom; // el arrastre ocurre en píxeles de pantalla; #mapstage está escalado por mapZoom
+    STATE.bgImage.x=Math.round(drag.bx+(e.clientX-drag.x0)/u);
+    STATE.bgImage.y=Math.round(drag.by+(e.clientY-drag.y0)/u);
+    renderBgImg();   // sólo local mientras se arrastra — no spamear el broadcast en cada pixel
+  });
+  const fin=e=>{ if(!drag)return; drag=null; dispatch({kind:'bgimgset', bgImage:{...STATE.bgImage}}); };
+  el.addEventListener('pointerup',fin); el.addEventListener('pointercancel',fin);
+
+  /* Manija en la esquina inferior derecha para escalar arrastrando, además del
+     campo "ancho en casillas" — más natural para calzar la foto mientras se mira
+     la grilla encima. El alto se recalcula solo (proporción fija, es una foto). */
+  if(hd){
+    hd.addEventListener('pointerdown',e=>{
+      if(mapMode!=='bgimg'||!selCanEdit()||!STATE.bgImage)return;
+      e.preventDefault(); e.stopPropagation();
+      rdrag={x0:e.clientX,y0:e.clientY,bw:STATE.bgImage.w};
+      try{hd.setPointerCapture(e.pointerId);}catch(err){}
+    });
+    hd.addEventListener('pointermove',e=>{
+      if(!rdrag)return;
+      const u=mapZoom, bi=STATE.bgImage;
+      const dw=(e.clientX-rdrag.x0)/u;
+      bi.w=Math.max(20, rdrag.bw+dw); bi.h=bi.w*(bi.ar||1);
+      renderBgImg();
+    });
+    const finR=e=>{ if(!rdrag)return; rdrag=null; dispatch({kind:'bgimgset', bgImage:{...STATE.bgImage}}); };
+    hd.addEventListener('pointerup',finR); hd.addEventListener('pointercancel',finR);
+  }
 }
 function setupPaint(){
   const g=document.getElementById('grid'); let batch=[], eraseDrag=false;
@@ -3634,6 +3793,7 @@ function syncCharSelects(){const opts=Object.values(STATE.characters).map(c=>`<o
 function refreshAll(){
   const g=document.getElementById('grid'); if(g&&!g.__bound){g.__bound=true; setupSelect(); setupPaint(); setupFog(); setupAspects(); setSelShape(selShape);}
   const ink=document.getElementById('ink'); if(ink&&!ink.__bound){ink.__bound=true; setupInk();}
+  const bgi=document.getElementById('mapbg'); if(bgi&&!bgi.__bound){bgi.__bound=true; setupBgImg();}
   const mw=document.getElementById('mapwrap'); if(mw&&!mw.__bound){mw.__bound=true; setupMapNav();}
   renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); buildPalette(); updatePeerCount();
   if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id;
@@ -4194,8 +4354,12 @@ function cellHiddenByRoom(r,c){
    estaba muerto. Ahora se crea con un nombre por defecto y se renombra en el panel,
    que además evita interrumpir con un modal. */
 function roomFromSelection(){
-  if(!(ME.isHost||!ME.peer)){flash('Solo el GM crea piezas.');return;}
-  if(!SEL.size){flash('No hay ninguna zona marcada — dibuja una primero.');return;}
+  if(!(ME.isHost||!ME.peer)){setStatus('Solo el GM crea piezas.');return;}
+  if(!SEL.size){setStatus('No hay ninguna zona marcada — dibuja una primero.');return;}
+  /* No se rellena terreno automáticamente (v13.5): pintar piso encima de la zona
+     tapaba la foto de referencia por completo, que es justo lo que no se quería.
+     La pieza queda con su perímetro nada más — si la niebla necesita atravesar
+     estas celdas más adelante, se pinta terreno a mano cuando corresponda. */
   const nm='Sala '+(roomsOf().length+1);
   const room={id:'rm-'+rid(6), name:nm,
     color:ROOM_COLORS[roomsOf().length%ROOM_COLORS.length],
@@ -4367,6 +4531,27 @@ function roomAddSelCells(id){ const r=roomById(id); if(!r)return;
   const copy=JSON.parse(JSON.stringify(r));
   const set=new Set(copy.cells||[]); SEL.forEach(k=>set.add(k)); copy.cells=[...set];
   dispatch({kind:'roomset',room:copy}); clearSelection(); flash('Área añadida a «'+r.name+'»'); }
+/* Muros automáticos en el perímetro de la pieza (v13.6): para cada celda del contorno,
+   el lado que NO tiene una celda de la misma pieza al otro extremo es un borde exterior.
+   Sólo toca bordes vacíos — si ya hay un muro o una puerta puesta a mano (por ejemplo
+   compartida con la pieza vecina), se respeta tal cual, así se puede repetir el botón
+   después de agrandar la pieza sin perder puertas ya abiertas. */
+function roomWallsPerimeter(id){
+  const r=roomById(id); if(!r)return;
+  const set=new Set(r.cells||[]);
+  const edges=[];
+  const add=key=>{ if(!STATE.edges[key])edges.push({key,val:'wall'}); };
+  (r.cells||[]).forEach(k=>{
+    const m=/^(\d+),(\d+)$/.exec(k); if(!m)return; const rr=+m[1],cc=+m[2];
+    if(!set.has((rr-1)+','+cc))add('h|'+rr+'|'+cc);
+    if(!set.has((rr+1)+','+cc))add('h|'+(rr+1)+'|'+cc);
+    if(!set.has(rr+','+(cc-1)))add('v|'+rr+'|'+cc);
+    if(!set.has(rr+','+(cc+1)))add('v|'+rr+'|'+(cc+1));
+  });
+  if(!edges.length){setStatus('El perímetro de «'+(r.name||'la pieza')+'» ya tenía muros o puertas.');return;}
+  dispatch({kind:'edgesset',edges});
+  setStatus('Muros puestos en el perímetro de «'+(r.name||'la pieza')+'» ('+edges.length+').');
+}
 /* Puertas secretas: los bordes marcados de la pieza. Se revelan por cualquiera de las
    tres vías acordadas — proximidad, tirada, o que el GM las abra — y una vez reveladas
    quedan así para toda la mesa. */
@@ -4530,6 +4715,11 @@ function renderRoomDetail(){
   box.innerHTML=`
     <div class="fld"><label>Nombre</label>
       <input value="${esc(r.name||'')}" onchange="roomEdit('${r.id}','name',this.value)"></div>
+    <div class="fld"><label>Estructura</label>
+      <div class="row" style="gap:4px;flex-wrap:wrap">
+        <button class="xs" onclick="roomWallsPerimeter('${r.id}')" title="pone muro en cada lado del contorno que no tenga ya algo — no pisa muros ni puertas existentes">🧱 muros en el perímetro</button>
+        <button class="xs" onclick="setSelShape('walls')" title="clic izq. sobre un muro lo convierte en puerta, der. lo quita — clic sobre cualquier línea del perímetro recién puesto">🚪 editar puertas</button>
+      </div></div>
     ${roomFoesHTML(r)}
     ${roomLootHTML(r)}
     ${roomEnvHTML(r)}
@@ -4573,15 +4763,15 @@ function applyGridOverlay(){
 function setSelShape(s){
   selShape=s;
   /* «muros» edita bordes, así que por dentro cambia el modo — pero para el usuario
-     sigue siendo Dibujo, y la barra lo refleja así. Si ya estábamos en Niebla, las
-     demás formas (rect/círculo/lazo) se quedan en Niebla — no saltan de vuelta a Dibujo. */
+     sigue siendo Dibujo, y la barra lo refleja así. Si ya estábamos en Niebla o
+     Piezas, las demás formas (rect/círculo/lazo) se quedan ahí — no saltan a Dibujo. */
   const sh=SHAPES.find(x=>x.id===s);
-  mapMode = sh&&sh.edges ? 'edges' : (mapMode==='fog'?'fog':'paint');
+  mapMode = sh&&sh.edges ? 'edges' : (mapMode==='fog'?'fog':mapMode==='room'?'room':'paint');
   const show=(id,on,disp)=>{const e=document.getElementById(id); if(e)e.style.display=on?(disp||''):'none';};
   show('edgehint', mapMode==='edges');
   show('tilewrap', mapMode==='paint');          // con muros no se elige casilla
   const mw=document.getElementById('mapwrap');
-  if(mw)mw.classList.toggle('selmode',(mapMode==='paint'||mapMode==='fog')&&s!=='free');
+  if(mw)mw.classList.toggle('selmode',(mapMode==='paint'||mapMode==='fog'||mapMode==='room')&&s!=='free');
   buildShapeBar(); buildModeBar(); renderMap();
 }
 function selCanEdit(){return ME.isHost||!ME.peer;}
@@ -4628,21 +4818,30 @@ function selCellsFor(d){
    de la propia pieza (no un azul fijo) para no perder de vista cuál es cuál cuando hay
    varias, pero con el mismo tratamiento de mancha suave que pediste. */
 function drawRoomFill(x,cell){
-  const rm=roomById(selRoom); if(!rm||!(rm.cells||[]).length)return;
   if(!(ME.isHost||!ME.peer))return;
+  const rooms=roomsOf(); if(!rooms.length)return;
   x.save();
-  x.fillStyle=hexRGBA(rm.color||'#c8862e',0.22);
-  rm.cells.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1]; x.fillRect(c*cell,r*cell,cell,cell);});
-  // contorno fino sólo en el borde exterior, para delimitar sin hacer rejilla
-  x.strokeStyle=hexRGBA(rm.color||'#c8862e',0.85); x.lineWidth=Math.max(1,1.5/mapZoom);
-  x.beginPath();
-  const has=k=>rm.cells.indexOf(k)>-1;
-  rm.cells.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1],X=c*cell,Y=r*cell;
-    if(!has((r-1)+','+c)){x.moveTo(X,Y);x.lineTo(X+cell,Y);}
-    if(!has((r+1)+','+c)){x.moveTo(X,Y+cell);x.lineTo(X+cell,Y+cell);}
-    if(!has(r+','+(c-1))){x.moveTo(X,Y);x.lineTo(X,Y+cell);}
-    if(!has(r+','+(c+1))){x.moveTo(X+cell,Y);x.lineTo(X+cell,Y+cell);}});
-  x.stroke(); x.restore();
+  // Sólo contorno, sin relleno (v13.4): con una imagen de fondo cargada, el
+  // relleno translúcido tapaba la foto justo donde se necesita ver para calzar
+  // la pieza. El contorno marca el perímetro igual, sin ocultar nada debajo.
+  // Todas las piezas se dibujan, no sólo la seleccionada (v13.5) — para el GM
+  // que va trazando varias salas encima de la foto y necesita verlas todas a
+  // la vez; la seleccionada se distingue con un trazo más grueso y opaco.
+  rooms.forEach(rm=>{
+    if(!(rm.cells||[]).length)return;
+    const sel=rm.id===selRoom;
+    x.strokeStyle=hexRGBA(rm.color||'#c8862e', sel?0.95:0.55);
+    x.lineWidth=Math.max(1,(sel?2.2:1.2)/mapZoom);
+    x.beginPath();
+    const has=k=>rm.cells.indexOf(k)>-1;
+    rm.cells.forEach(k=>{const a=k.split(','),r=+a[0],c=+a[1],X=c*cell,Y=r*cell;
+      if(!has((r-1)+','+c)){x.moveTo(X,Y);x.lineTo(X+cell,Y);}
+      if(!has((r+1)+','+c)){x.moveTo(X,Y+cell);x.lineTo(X+cell,Y+cell);}
+      if(!has(r+','+(c-1))){x.moveTo(X,Y);x.lineTo(X,Y+cell);}
+      if(!has(r+','+(c+1))){x.moveTo(X+cell,Y);x.lineTo(X+cell,Y+cell);}});
+    x.stroke();
+  });
+  x.restore();
 }
 /* Animación del borde de selección. El bucle sólo corre mientras hay algo marcado y
    se apaga solo: no conviene dejar un rAF girando toda la sesión. */
@@ -4751,12 +4950,16 @@ function setupSelect(){
   const pos=ev=>{const r=g.getBoundingClientRect(), u=STATE.grid.cell*mapZoom;
     return [(ev.clientX-r.left)/u,(ev.clientY-r.top)/u];};
   g.addEventListener('pointerdown',e=>{
-    if((mapMode!=='paint'&&mapMode!=='fog')||selShape==='free'||!selCanEdit())return;
+    if((mapMode!=='paint'&&mapMode!=='fog'&&mapMode!=='room')||selShape==='free'||!selCanEdit())return;
     if(e.button!==0&&e.button!==2)return;
     e.preventDefault(); e.stopPropagation();
     const p=pos(e);
+    /* En Piezas cada forma nueva se SUMA a la selección por defecto (Alt resta),
+       para poder construir un contorno complejo con varias formas antes de
+       "agregar pieza" — sólo Esc la suelta. En Dibujo/Niebla se mantiene el
+       comportamiento de siempre (Shift/Alt para no reemplazar la selección). */
     selDrag={shape:selShape,btn:e.button,x0:p[0],y0:p[1],x1:p[0],y1:p[1],pts:[[p[0],p[1]]],
-             mode:e.altKey?'sub':'add',keep:(e.shiftKey||e.altKey)};
+             mode:e.altKey?'sub':'add',keep:(mapMode==='room')||(e.shiftKey||e.altKey)};
     try{g.setPointerCapture(e.pointerId);}catch(err){}
     renderSelection();
   });
