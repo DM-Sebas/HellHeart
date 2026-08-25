@@ -620,7 +620,8 @@
 
   <!-- CHARACTERS (GM) -->
   <div class="panel scroll" id="panel-characters" data-pane="characters" data-label="Characters">
-    <h2 style="color:var(--gold)">Party</h2>
+    <div class="row" style="justify-content:space-between;align-items:center"><h2 style="color:var(--gold);margin:0">Party</h2>
+      <button class="sm" onclick="importChar()" title="añade un personaje desde un archivo .pulpheart-char.json (o .thornheart-char.json)">📂 Importar personaje</button></div>
     <div id="partyTable"></div>
     <h2 style="color:var(--gold);margin-top:18px">Active NPCs</h2>
     <div id="encTable"></div>
@@ -995,9 +996,12 @@ let LS_OK=true;
 try{ const k='__ph_test'; localStorage.setItem(k,'1'); localStorage.removeItem(k); }
 catch(e){ LS_OK=false; }
 function lsGet(k){ if(!LS_OK)return null; try{ return localStorage.getItem(k); }catch(e){ LS_OK=false; return null; } }
-function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){ LS_OK=false; return false; } }
+function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); return true; }catch(e){
+  /* Cuota llena ≠ almacenamiento bloqueado: si es cuota, las lecturas y las escrituras
+     chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
+  if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v13.6';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v13.8';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1030,25 +1034,47 @@ function relayWarnUpdate(){
 /* WebSocket con reintentos, compartido por GM y jugador. Los reintentos importan
    más de lo que parece: en el plan gratis de Render el servicio se duerme tras
    ~15 min y el primer intento de la noche tarda ~1 min en despertarlo. */
-function openRelaySocket(url,{onopen,onmessage,onclose,onfail,maxTries=3}={}){
-  let tries=0,stopped=false,sock=null;
+function openRelaySocket(url,{onopen,onmessage,onclose,onfail,onreopen,maxTries=3}={}){
+  /* Una vez que la conexión FUNCIONÓ, una caída nunca se rinde: reintenta para
+     siempre con backoff acotado y llama `onreopen` (o `onopen` si no hay) al
+     volver — un parpadeo de wifi ya no mata la mesa hasta recargar la página.
+     El timeout de 12s se mantiene por el relay dormilón de Render. */
+  let tries=0,stopped=false,sock=null,everOpened=false;
+  function retry(){
+    if(stopped)return;
+    if(everOpened){ tries=Math.min(tries+1,6); setTimeout(attempt,Math.min(1500*tries,10000)); }
+    else if(tries<maxTries)setTimeout(attempt,1500*tries);
+    else onfail&&onfail(new Error('gave up'));
+  }
   function attempt(){
-    tries++;
-    try{sock=new WebSocket(url);}catch(e){
-      if(tries<maxTries&&!stopped)setTimeout(attempt,1500*tries); else onfail&&onfail(e); return;}
+    if(!everOpened)tries++;
+    try{sock=new WebSocket(url);}catch(e){ retry(); return;}
     let opened=false;
-    const failTimer=setTimeout(()=>{ if(!opened){ try{sock.close();}catch(e){}
-      if(tries<maxTries&&!stopped)setTimeout(attempt,1500*tries); else onfail&&onfail(new Error('timeout')); } },12000);
-    sock.onopen=()=>{opened=true;clearTimeout(failTimer);onopen&&onopen(sock);};
+    // en timeout basta cerrar: el onclose de abajo enruta hacia retry()
+    const failTimer=setTimeout(()=>{ if(!opened){ try{sock.close();}catch(e){} } },12000);
+    sock.onopen=()=>{opened=true;clearTimeout(failTimer);
+      const was=everOpened; everOpened=true; tries=0;
+      if(was&&onreopen)onreopen(sock); else onopen&&onopen(sock);};
     sock.onmessage=(ev)=>{let d;try{d=JSON.parse(ev.data);}catch(e){return;} onmessage&&onmessage(d);};
     sock.onclose=(ev)=>{clearTimeout(failTimer);
-      if(!opened&&tries<maxTries&&!stopped){setTimeout(attempt,1500*tries);return;}
-      onclose&&onclose(ev);};
+      if(stopped)return;
+      if(opened)onclose&&onclose(ev);
+      retry();};
     sock.onerror=()=>{};
   }
   attempt();
   return {stop(){stopped=true;try{sock&&sock.close();}catch(e){}}, get socket(){return sock;}};
 }
+/* Pantallas encendidas mientras estás conectado a una sala — los jugadores usan el
+   teléfono como hoja de personaje y el bloqueo a mitad de combate es un clásico. */
+let __wakeLock=null;
+async function acquireWakeLock(){
+  try{ if(navigator.wakeLock&&!__wakeLock&&ME.socket&&ME.socket.readyState===WebSocket.OPEN){
+    __wakeLock=await navigator.wakeLock.request('screen');
+    __wakeLock.addEventListener('release',()=>{__wakeLock=null;});
+  } }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible')acquireWakeLock(); });
 /* Avisar al relay antes de irse. Medido contra el despliegue real: si sólo cierras
    el socket, al resto de la mesa le toma ~10s enterarse — el proxy delante de Render
    no propaga el cierre al instante. Con este aviso la baja es inmediata.
@@ -1069,7 +1095,16 @@ function campTouch(meta){const l=campIndex();const i=l.findIndex(x=>x.id===meta.
   l.sort((a,b)=>(b.lastPlayed||0)-(a.lastPlayed||0)); campIndexSave(l);}
 function campSave(){ if(!CAMP)return;
   const now=Date.now(); if(now-(campSave.__t||0)<1500)return; campSave.__t=now;
-  try{lsSet('ph-camp-'+CAMP.id,JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE}));}catch(e){}
+  const ok=lsSet('ph-camp-'+CAMP.id,JSON.stringify({v:1,saved:new Date().toISOString(),state:STATE}));
+  if(ok){ campSave.__warnT=0; }
+  else if(LS_OK){
+    /* Falló por cuota (LS_OK sigue true): avisar fuerte, máximo cada 5 min — el
+       fallo mudo es como una campaña deja de autoguardarse sin que nadie se entere. */
+    if(!campSave.__warnT||now-campSave.__warnT>300000){campSave.__warnT=now;
+      flash('⚠ El autoguardado en este navegador está FALLANDO — la campaña ya no cabe en su almacenamiento. '
+        +(ME.isHost?'Vincula un archivo de campaña (🗎 en Campañas — sin límite de tamaño) o quita una imagen pesada del mapa.':'Avísale a tu GM.'));
+    }
+  }
   campTouch({id:CAMP.id,name:STATE.campName||CAMP.name,code:CAMP.code,lastPlayed:now});
   campFileWrite();}
 function campLoadState(id){try{const d=JSON.parse(lsGet('ph-camp-'+id));return (d&&d.state)||null}catch(e){return null}}
@@ -1226,6 +1261,17 @@ function hostCampaign(code){
       setDot('host','hosting'); setStatus(''); closeModal('connectModal');
       STATE.presence=[{id:'gm',name:ME.name,role:'GM'}];
       layout('gm'); refreshAll(); campSave.__t=0; campSave();
+      acquireWakeLock();
+    },
+    onreopen(sock){
+      /* Reconectado tras una caída: misma sala, mismo secreto. Se re-difunde el
+         estado para que todos resincronicen; sin layout() ni modal, la pestaña
+         del GM no se mueve. */
+      ME.socket=sock; ME.peer=sock;
+      setDot('host','hosting');
+      flash('Reconectado al relay.');
+      broadcast();
+      acquireWakeLock();
     },
     onmessage(d){
       if(d.t==='sys'){
@@ -1271,10 +1317,14 @@ function joinCampaign(cmp,localState){
     if(localState){
       STATE=localState; normalizeFloors();
       ME.isHost=false; ME.role='player'; ME.id='off-'+rid(4);
+      /* Re-vincular mis personajes por nombre (lo que haría el `hello` del GM):
+         owner es un id de sesión que cambia en cada conexión, así que sin esto
+         la pestaña Sheet aparece vacía en modo offline. */
+      Object.values(STATE.characters).forEach(c=>{if(nameEq(c.playerName,ME.name))c.owner=ME.id;});
       document.getElementById('roleTag').textContent='Jugador (offline)';
-      setDot('','GM offline — última sincronización');
+      setDot('','GM offline — la hoja se sincronizará después');
       closeModal('connectModal'); layout('player'); refreshAll();
-      flash('El GM no está conectado: ves la última versión sincronizada. Los cambios locales no se compartirán.');
+      flash('El GM no está conectado: ves tu última copia sincronizada. Los campos de la hoja (PV, Esperanza, notas, monedas) se guardan y se sincronizan cuando la mesa vuelva; subir de nivel y cartas necesitan al GM.');
     } else setStatus(msg);
   };
   if(!base){ offline('Todavía no hay relay configurado — pídele a tu GM la dirección y ponla en "config. de red".'); return; }
@@ -1290,21 +1340,45 @@ function joinCampaign(cmp,localState){
       document.getElementById('roleTag').textContent='Jugador';
       setDot('on','connected'); setStatus(''); closeModal('connectModal');
       layout('player');
-      sock.send(JSON.stringify({t:'action',action:{kind:'hello',name:ME.name,id:ME.id}}));
+      sock.send(JSON.stringify({t:'action',action:{kind:'hello',name:ME.name,id:ME.id,build:PH_BUILD}}));
+      acquireWakeLock();
+    },
+    onreopen(sock){
+      /* Reconectado tras una caída: hello fresco para que el GM nos re-vincule y
+         mande el estado; sin layout(), la pestaña actual no se mueve. */
+      ME.socket=sock; ME.peer=sock;
+      setDot('on','connected');
+      sock.send(JSON.stringify({t:'action',action:{kind:'hello',name:ME.name,id:ME.id,build:PH_BUILD}}));
+      acquireWakeLock();
     },
     onmessage(d){
       if(d.t==='sys'){
         if(d.kind==='no-host'){
           setDot('','el GM no está conectado');
-          flash('La sala existe pero el GM no está dentro ahora mismo.');
+          if(!window.__gotState&&localState&&!window.__roCopy){
+            /* La sala existe pero el GM no está: mostrar la última copia sincronizada
+               en vez de una mesa vacía — la mesa vacía se lee como "borraron mi
+               personaje" e invita a crear un duplicado. */
+            window.__roCopy=true;
+            STATE=localState; normalizeFloors();
+            Object.values(STATE.characters).forEach(c=>{if(nameEq(c.playerName,ME.name))c.owner=ME.id;});
+            document.getElementById('roleTag').textContent='Jugador (copia offline)';
+            refreshAll();
+            flash('El GM no está dentro: ves tu última copia sincronizada. Los cambios de hoja se guardan y se sincronizan solos cuando el GM vuelva.');
+          } else if(!window.__roCopy){
+            flash('La sala existe pero el GM no está dentro ahora mismo.');
+          }
         } else if(d.kind==='host-back'){
           setDot('on','connected'); flash('El GM volvió a conectarse.');
+          /* hello fresco: el GM que vuelve re-vincula a este jugador y difunde el
+             estado, lo que además levanta la copia de solo lectura de arriba. */
+          try{ME.socket.send(JSON.stringify({t:'action',action:{kind:'hello',name:ME.name,id:ME.id,build:PH_BUILD}}));}catch(e){}
         }
         return;
       }
       playerReceive(d);
     },
-    onclose(){ setDot('','desconectado'); },
+    onclose(){ setDot('','reconectando…'); },
     onfail(){ offline('No pude alcanzar la campaña '+cmp.code+'. Revisa: (1) que el GM esté DENTRO como GM ahora mismo, (2) que el código sea el correcto, (3) que ambos usen el MISMO relay.'); }
   });
 }
@@ -1312,9 +1386,16 @@ function hostReceive(conn,d){ if(d.t!=='action')return; const a=d.action;
   if(a.kind==='hello'){
     const ex=Object.values(STATE.characters).find(c=>nameEq(c.playerName,a.name));
     if(ex)ex.owner=a.id;
+    if(a.build&&a.build!==PH_BUILD)log(null,a.name||'Un jugador',' está en build '+a.build+' (la mesa corre '+PH_BUILD+') — pídele recargar la página.',true);
     broadcast(); return; }
   apply(a); broadcast(); }
 function playerReceive(d){ if(d.t==='state'){ STATE=d.state;
+  window.__gotState=true;
+  if(window.__roCopy||window.__forceRO){ window.__roCopy=false; window.__forceRO=false;
+    document.getElementById('roleTag').textContent='Jugador'; setDot('on','connected'); }
+  if(d.build&&d.build!==PH_BUILD&&!window.__buildWarned){ window.__buildWarned=true;
+    flash('⚠ Tu página corre el build '+PH_BUILD+' pero el GM está en '+d.build+' — recarga forzada (Ctrl/Cmd+Shift+R) para actualizar.'); }
+  queueReplay();
   if(!window.__welcomed&&STATE.lastRoll)shownRoll=STATE.lastRoll.id;
   refreshAll(); campSave();
   if(!window.__welcomed){window.__welcomed=true;
@@ -1543,16 +1624,47 @@ function applyFloorsFile(d){
   dispatch({kind:'floorsload',floors,tokens,idx:Math.max(0,Math.min(+d.floorIdx||0,floors.length-1))});
   flash('Multi-floor map loaded: '+floors.length+' floors'+(skipped?' ('+skipped+' skipped)':''));
 }
+/* ---- cola offline ----
+   Las ediciones de hoja hechas sin GM son acciones a nivel de campo (charfield/
+   resource), así que se pueden guardar y reproducir sin peligro cuando la mesa
+   vuelve: reproducir "hope=3" toca solo hope, nunca el personaje entero. Lo
+   estructural (subir de nivel, cartas, equipo — `upchar` de objeto completo)
+   queda bloqueado offline porque reproducirlo pisaría lo que hizo el GM. */
+const QUEUEABLE={charfield:1,resource:1};
+function queueKey(){return 'ph-queue-'+(CAMP?CAMP.id:'x');}
+function queuePush(a){try{const q=JSON.parse(lsGet(queueKey()))||[]; q.push(a); if(q.length>300)q.shift(); lsSet(queueKey(),JSON.stringify(q));}catch(e){}}
+function queueReplay(){
+  let q=[]; try{q=JSON.parse(lsGet(queueKey()))||[];}catch(e){}
+  if(!q.length)return;
+  if(!(ME.socket&&ME.socket.readyState===WebSocket.OPEN&&!window.__roCopy))return;
+  lsDel(queueKey());
+  let sent=0;
+  q.forEach(a=>{ const id=a.id||a.charId; if(id&&!STATE.characters[id])return;
+    apply(a); ME.socket.send(JSON.stringify({t:'action',action:a})); sent++; });
+  if(sent)flash('Sincronizado'+(sent===1?'':'s')+' '+sent+' cambio'+(sent===1?'':'s')+' offline de tu hoja.');
+}
+function myCharAction(a){ const id=a.id||a.charId; const ch=id&&STATE.characters[id];
+  return !!(ch&&(ch.owner===ME.id||nameEq(ch.playerName,ME.name))); }
 function dispatch(action){
   if(ME.isHost){ apply(action); broadcast(); }
-  else if(ME.socket&&ME.socket.readyState===WebSocket.OPEN){ ME.socket.send(JSON.stringify({t:'action',action})); }
-  else { apply(action); refreshAll(); campSave(); }
+  else if(!window.__roCopy&&ME.socket&&ME.socket.readyState===WebSocket.OPEN){ ME.socket.send(JSON.stringify({t:'action',action})); }
+  else if(QUEUEABLE[action.kind]&&myCharAction(action)){
+    apply(action); queuePush(action); refreshAll(); campSave();
+  } else if(action.kind==='roll'||action.kind==='log'){
+    apply(action); refreshAll(); campSave();   // efímero offline: tiradas de práctica y chat
+  } else {
+    flash('No disponible sin el GM conectado. Los campos de la hoja (PV, Esperanza, Estrés, notas, monedas) SÍ se guardan y se sincronizan cuando la mesa vuelva.');
+  }
 }
 /* Un solo envío al relay, que lo reparte a todos los jugadores. Antes había que
    iterar una conexión por jugador; ahora el fan-out lo hace el servidor. */
 function broadcast(){ refreshAll(); campSave();
-  if(ME.isHost&&ME.socket&&ME.socket.readyState===WebSocket.OPEN)
-    ME.socket.send(JSON.stringify({t:'state',state:STATE})); }
+  if(ME.isHost&&ME.socket&&ME.socket.readyState===WebSocket.OPEN){
+    /* La llave de host nunca sale del navegador del GM; los jugadores reciben
+       además el build del GM para que una página cacheada vieja se delate sola. */
+    const pub=Object.assign({},STATE); delete pub.campHostSecret;
+    ME.socket.send(JSON.stringify({t:'state',state:pub,build:PH_BUILD}));
+  } }
 
 function apply(a){
   normalizeFloors();
@@ -1630,7 +1742,7 @@ function apply(a){
       break;}
     case 'releasechar':{const ch=STATE.characters[a.charId]; if(ch){ch.owner=''; ch.playerName='';} break;}
     case 'delchar': delete STATE.characters[a.id]; STATE.tokens=STATE.tokens.filter(t=>t.charId!==a.id); break;
-    case 'resource':{const ch=STATE.characters[a.id]; if(ch)ch[a.field]=a.value; break;}
+    case 'charfield': case 'resource':{const ch=STATE.characters[a.id]; if(ch)ch[a.field]=a.value; break;}
     case 'fear': STATE.fear=Math.max(0,Math.min(12,a.value)); break;
     case 'npclib': STATE.npcLibrary=a.list; break;
     case 'envlib': STATE.envLibrary=a.list; break;
@@ -1716,6 +1828,34 @@ function poolLabel(ch){
   return parts.filter(Boolean).join(' · ');
 }
 function copyChar(id){const ch=STATE.characters[id]; return ch?JSON.parse(JSON.stringify(ch)):null;}
+/* ---- archivos de personaje: cada jugador tiene un respaldo portátil de su héroe ----
+   La copia canónica sigue viviendo en el estado del GM; este archivo es el seguro del
+   jugador contra el navegador (o el laptop) del GM muriendo. */
+function exportChar(id){
+  const ch=STATE.characters[id]; if(!ch)return;
+  const data={v:1,type:'pulpheart-character',build:PH_BUILD,saved:new Date().toISOString(),char:JSON.parse(JSON.stringify(ch))};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.download=(ch.name||'personaje').replace(/[^a-z0-9_-]+/gi,'_')+'.pulpheart-char.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  flash('Personaje descargado — guarda el archivo como tu respaldo personal.');
+}
+function importChar(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+  inp.onchange=async()=>{
+    const f=inp.files&&inp.files[0]; if(!f)return;
+    let d; try{d=JSON.parse(await f.text());}catch(e){flash('No es un archivo de personaje válido.');return;}
+    /* Acepta también archivos del VTT hermano (thornheart-character) para que las hojas
+       viajen entre mesas; blankChar() rellena los campos que esa mesa no tenía. */
+    if(!d||!/-character$/.test(String(d.type||''))||!d.char||!d.char.name){flash('No es un archivo de personaje válido.');return;}
+    const ch=Object.assign(blankChar(rid(6),d.char.name),d.char);
+    ch.id=rid(6); ch.owner=''; ch.playerName='';
+    dispatch({kind:'upchar',char:ch});
+    flash('«'+ch.name+'» importado — libre para reclamar.');
+  };
+  inp.click();
+}
 
 function effStats(ch){
   const gear=[ch.armorItem,ch.primary,ch.secondary,...(ch.gear||[])].filter(Boolean);
@@ -1793,6 +1933,7 @@ function renderOneSheet(ch){
       ${ch.multiclass?`<span class="tag clstag mctag"${classColor(ch.multiclass)?` style="--cc:${classColor(ch.multiclass)}"`:''} title="Multiclass${ch.mcDomain?' — '+esc(ch.mcDomain)+' cards up to level '+mcCardCap(ch)+' (half your level, rounded up)':''}${ch.mcSubclass?' · foundation from '+esc(ch.mcSubclass):''}">⚑ ${esc(ch.multiclass)}${ch.mcDomain?' · '+esc(ch.mcDomain):''}</span>`:''}
       ${!ed&&ME.peer&&!ME.isHost?`<button class="xs" onclick="claimChar('${ch.id}')" title="make this your character (e.g. after restoring a saved session)">claim</button>`:''}
       ${ed&&ch.owner===ME.id?`<button class="xs" onclick="releaseChar('${ch.id}')" title="free this character so another player can claim it">release</button>`:''}
+      ${(ch.owner===ME.id||ME.isHost||nameEq(ch.playerName,ME.name))?`<button class="xs" onclick="exportChar('${ch.id}')" title="descarga este personaje como archivo — tu respaldo personal">⬇ archivo</button>`:''}
       ${ed?`<button class="sm danger" onclick="delChar('${ch.id}')">✕</button>`:''}
     </div>
     <div class="sh-grid" style="margin-top:8px">
@@ -2238,9 +2379,13 @@ function pipHint(id){const ch=STATE.characters[id]; if(!ch||ME.isHost)return;
   dispatch({kind:'claimchar',charId:id,owner:ME.id,playerName:ME.name});
   flash('Ficha reclamada \u2014 ya puedes marcar HP/armor.'); setTimeout(refreshAll,300);}
 function setPip(id,field,i){const ch=STATE.characters[id]; if(!ch)return; const v=(ch[field]===i)?i-1:i; dispatch({kind:'resource',id,field,value:Math.max(0,v)});}
-function editC(id,field,val){const ch=copyChar(id); if(!ch)return; ch[field]=val; dispatch({kind:'upchar',char:ch});}
+/* Edición campo a campo: mandar sólo {field,value} en vez del personaje completo evita
+   que el GM inspeccionando una hoja y su jugador editándola se pisen mutuamente. */
+function editC(id,field,val){dispatch({kind:'charfield',id,field,value:val});}
 function setClass(id,val){const ch=copyChar(id); ch.cls=val; ch.subclass=''; dispatch({kind:'upchar',char:ch});}
 function newChar(){
+  if(!ME.isHost&&(window.__roCopy||!(ME.socket&&ME.socket.readyState===WebSocket.OPEN))){
+    flash('Crear personaje necesita al GM conectado — si no, el héroe nuevo se perdería en la próxima sincronización. Inténtalo cuando la mesa esté arriba.');return;}
   if(!ME.isHost&&Object.values(STATE.characters).some(c=>c.owner===ME.id)){flash('One hero per player — release or delete your current character first.');return;}
   openCreator();}
 function delChar(id){if(okDouble('char'+id,'Borrar este personaje.'))dispatch({kind:'delchar',id});}
@@ -3795,7 +3940,21 @@ function refreshAll(){
   const ink=document.getElementById('ink'); if(ink&&!ink.__bound){ink.__bound=true; setupInk();}
   const bgi=document.getElementById('mapbg'); if(bgi&&!bgi.__bound){bgi.__bound=true; setupBgImg();}
   const mw=document.getElementById('mapwrap'); if(mw&&!mw.__bound){mw.__bound=true; setupMapNav();}
+  /* Conservar lo que se está escribiendo: los innerHTML de abajo destruyen el campo
+     enfocado y se pierde el texto a medias cada vez que CUALQUIERA tira dados o
+     dibuja. Se recuerda el campo (clave = su handler inline, único por campo), el
+     borrador y el cursor, y se restauran tras el rebuild. */
+  const ae=document.activeElement; let keep=null;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.closest&&ae.closest('#screen,#stock')){
+    const key=(ae.getAttribute('onchange')||'')+'|'+(ae.getAttribute('oninput')||'');
+    if(key!=='|')keep={key,tag:ae.tagName,value:ae.value,ss:ae.selectionStart,se:ae.selectionEnd};
+  }
   renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); buildPalette(); updatePeerCount();
+  if(keep){
+    const el=[...document.querySelectorAll(keep.tag.toLowerCase())].find(e=>
+      ((e.getAttribute('onchange')||'')+'|'+(e.getAttribute('oninput')||''))===keep.key);
+    if(el){ el.value=keep.value; try{el.focus({preventScroll:true}); el.setSelectionRange(keep.ss,keep.se);}catch(e){} }
+  }
   if(STATE.lastRoll&&STATE.lastRoll.id!==shownRoll){shownRoll=STATE.lastRoll.id;
     if(activeTab!=='dice')showRollToast(STATE.lastRoll);   // en Dice ya se ve en el centro de la rueda — el toast ahí sobra
     updateDiceCenter(STATE.lastRoll);}
@@ -3931,7 +4090,7 @@ function openWelcome(){
       const locked=c.playerName&&!nameEq(c.playerName,ME.name);
       return '<div class="opt'+(locked?' dis':'')+'" onclick="welcomeClaim(\''+c.id+'\')"><div><b style="color:var(--gold)">'+esc(c.name)+'</b> <span class="tag">'+esc(c.cls||'no class')+' L'+c.level+'</span>'
       +(c.playerName?'<div class="muted" style="font-size:11px">'+(locked?'🔒 claimed by ':'player: ')+esc(c.playerName)+'</div>':'<div class="muted" style="font-size:11px">free to claim</div>')+'</div></div>';}).join('')+'</div>':'<p class="muted">No characters on this table yet.</p>')
-   +'<div class="row" style="margin-top:10px;justify-content:space-between"><button class="sm" onclick="closeGen()">later</button><button class="sm primary" onclick="closeGen();newChar()">+ Create new character</button></div>';
+   +'<div class="row" style="margin-top:10px;justify-content:space-between"><button class="sm" onclick="closeGen()">later</button><span><button class="sm" onclick="closeGen();importChar()" title="restaura un personaje desde un archivo .pulpheart-char.json">📂 Importar de archivo</button> <button class="sm primary" onclick="closeGen();newChar()">+ Create new character</button></span></div>';
   document.getElementById('genModal').classList.add('show');
 }
 function welcomeClaim(id){
