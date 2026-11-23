@@ -788,12 +788,12 @@
     <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
       <input id="itSearch" placeholder="buscar objeto, arma o armadura…" style="flex:1;min-width:180px" oninput="renderItems()">
       <span class="muted" style="font-size:12px">para:</span><select id="itTarget" onchange="renderItems()"></select>
-      <label class="muted" style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="itCharge" checked onchange="renderItems()"> descontar créditos</label>
+      <span id="itRule" class="muted" style="font-size:12px"></span>
     </div>
     <div id="itChips" class="chips"></div>
     <div id="itCount" class="muted" style="font-size:11px;margin:2px 0 8px"></div>
     <div id="itList"></div>
-    <p class="muted" style="font-size:11px;margin-top:10px">Todo lo que se saca de acá va al inventario del personaje. Las armas y armaduras se equipan desde la hoja con «⇄ equipar».</p>
+    <p class="muted" style="font-size:11px;margin-top:10px">Todo lo que sale de acá va al <b>inventario</b> del personaje (hoja → Equipamiento), y desde ahí se equipa.</p>
   </div>
 
   <!-- RULES -->
@@ -1021,7 +1021,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.3';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.4';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -2036,17 +2036,22 @@ function renderOneSheet(ch){
   return h;
 }
 function equipmentSection(ch,ed){
-  let h=`<hr><h3 style="color:var(--gold)">Equipment</h3>`;
-  h+=`<div class="row" style="justify-content:space-between"><b>Armor</b>${ed?`<button class="xs" onclick="openEquip('${ch.id}','armor')">${ch.armorItem?'change':'+ equip armor'}</button>`:''}</div>`;
+  /* v14.4: Equipamiento = lo EQUIPADO (armadura, primaria, secundaria) + el INVENTARIO
+     con todo lo que el personaje tiene. Se equipa desde el inventario; lo equipado
+     vuelve al inventario. Los ítems nuevos salen de la pestaña Ítems (el jugador paga
+     con créditos, el GM entrega gratis). */
+  const gm=(ME.isHost||!ME.peer);
+  const slot=(label,key,kind)=>ch[key]?equipCardHTML(ch[key],ch,ed,key,kind)
+    :`<div class="gcard" style="opacity:.55;border-style:dashed"><div class="top"><span class="nm">${label}</span></div><div class="txt muted">vacío — equípalo desde el inventario</div></div>`;
+  let h=`<hr><h3 style="color:var(--gold)">Equipamiento</h3>`;
+  h+=`<div class="row" style="justify-content:space-between"><b>Equipado</b></div>`;
+  h+=`<div class="cardgrid" style="margin:6px 0">${slot('Armadura','armorItem','armor')}${slot('Arma primaria','primary','weapon')}${slot('Arma secundaria','secondary','weapon')}</div>`;
+  const inv=ch.gear||[];
+  h+=`<div class="row" style="justify-content:space-between;margin-top:10px"><b>Inventario <span class="muted" style="font-size:12px">${inv.length} · ◈ ${+ch.gold||0}</span></b>`
+    +(ed?`<span><button class="xs primary" onclick="window.__itTarget='${ch.id}';showTab('items')">${gm?'+ dar del catálogo':'+ sacar del catálogo'}</button>${gm?` <button class="xs" onclick="customItem('${ch.id}')">+ custom</button>`:''}</span>`:'')+`</div>`;
   h+=`<div class="cardgrid" style="margin:6px 0">`;
-  if(ch.armorItem)h+=equipCardHTML(ch.armorItem,ch,ed,'armorItem','armor');
-  h+=`</div><div class="row" style="justify-content:space-between"><b>Weapons</b>${ed?`<button class="xs" onclick="openEquip('${ch.id}','primary')">primary</button> <button class="xs" onclick="openEquip('${ch.id}','secondary')">secondary</button>`:''}</div>`;
-  h+=`<div class="cardgrid" style="margin:6px 0">`;
-  if(ch.primary)h+=equipCardHTML(ch.primary,ch,ed,'primary','weapon');
-  if(ch.secondary)h+=equipCardHTML(ch.secondary,ch,ed,'secondary','weapon');
-  h+=`</div><div class="row" style="justify-content:space-between"><b>Items</b>${ed?`<button class="xs" onclick="openEquip('${ch.id}','gear')">+ item</button> <button class="xs" onclick="customItem('${ch.id}')">+ custom</button>`:''}</div>`;
-  h+=`<div class="cardgrid" style="margin:6px 0">`;
-  (ch.gear||[]).forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,isWeaponItem(it)?'weapon':isArmorItem(it)?'armor':'item'));
+  inv.forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,isWeaponItem(it)?'weapon':isArmorItem(it)?'armor':'item'));
+  if(!inv.length)h+=`<p class="muted" style="font-size:12px">Sin ítems. Se sacan desde la pestaña Ítems.</p>`;
   h+=`</div>`;
   return h;
 }
@@ -2112,12 +2117,12 @@ function equipCardHTML(e,ch,ed,slot,kind){
   let acts='';
   if(ed){
     if(inGear&&kind==='armor')acts+=`<button class="xs" onclick="equipFromGear('${ch.id}',${gi},'armorItem')">⇄ equipar armadura</button>`;
-    if(!inGear&&kind==='armor')acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
+    if(false)acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
     if(inGear&&kind==='weapon')acts+=`<button class="xs" onclick="equipFromGear('${ch.id}',${gi},'${e.type==='Secondary'?'secondary':'primary'}')">⇄ equipar como ${e.type==='Secondary'?'secundaria':'primaria'}</button>`;
-    if(!inGear&&kind==='weapon')acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
-    acts+=`<button class="xs danger" onclick="unequip('${ch.id}','${slot}')">${inGear?'quitar':'unequip'}</button>`;
+    if(!inGear)acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
+    if(inGear)acts+=`<button class="xs danger" onclick="unequip('${ch.id}','${slot}')" title="sacarlo del inventario (se pierde)">quitar</button>`;
   }
-  return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span>${costBadges(e)}<span class="badge eqp">${inGear?(kind==='weapon'?'en inventario':'carried'):'equipped'}</span></span></div>
+  return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span>${costBadges(e)}<span class="badge eqp">${inGear?'inventario':'equipado'}</span></span></div>
     <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${gearMetaBadges(e,kind)}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
     ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}
     ${usesHTML(e,ch,ed,slot)}
@@ -4071,10 +4076,11 @@ function renderItems(){
   const sel=document.getElementById('itTarget'), tg=itTargets();
   const prev=sel.value;
   sel.innerHTML=(tg.length?'':'<option value="">— sin personaje —</option>')+tg.map(c=>`<option value="${c.id}">${esc(c.name||'PJ')}${gm&&c.playerName?' ('+esc(c.playerName)+')':''}</option>`).join('');
-  if(tg.some(c=>c.id===prev))sel.value=prev;
+  if(window.__itTarget&&tg.some(c=>c.id===window.__itTarget)){sel.value=window.__itTarget; window.__itTarget=null;}
+  else if(tg.some(c=>c.id===prev))sel.value=prev;
   sel.disabled=!gm;
   const ch=STATE.characters[sel.value]||null;
-  const charge=document.getElementById('itCharge').checked;
+  const ru=document.getElementById('itRule'); if(ru)ru.textContent=gm?'GM: entrega gratis, sin límite de créditos ni de grado':'se paga con tus créditos';
   document.getElementById('itChips').innerHTML=IT_FILTERS.map(([k,t,col])=>`<button class="chip${itFilter===k?' on':''}" style="--cc:${col||categoryColor(k)||'#c8a24a'}" onclick="itToggle('${k}')">${esc(t)}</button>`).join('')
     +'<span class="chipsep"></span>'+['M','D','C'].map(g=>`<button class="chip${itFilter==='g:'+g?' on':''}" onclick="itToggle('g:${g}')">${g==='M'?'Mundane':g+'-tier'}</button>`).join('')
     +(ch?`<span class="chipsep"></span><span class="muted" style="font-size:12px">${esc(ch.name||'PJ')} · Tier ${tierOf(ch.level||1)} · acceso hasta ${GRADE_LABEL[clearanceOf(ch)]} · ◈ ${+ch.gold||0}</span>`:'');
@@ -4086,8 +4092,8 @@ function renderItems(){
     const i=pool.findIndex(p=>p[1]===e);
     let act='';
     if(ch){
-      const over=!gradeAllowed(e,ch);
-      const cost=charge&&e.credit!=null?+e.credit:0, poor=cost>(+ch.gold||0);
+      const over=!gm&&!gradeAllowed(e,ch);
+      const cost=!gm&&e.credit!=null?+e.credit:0, poor=cost>(+ch.gold||0);
       const lbl=gm?'→ enviar a '+esc(ch.name||'PJ'):'+ sacar para mí';
       act=over?`<span class="muted" style="font-size:11px">${gradeOf(e)==='S'?'S-tier: solo lo da el GM':'sin acceso (Tier '+tierOf(ch.level||1)+' llega hasta '+GRADE_LABEL[clearanceOf(ch)]+')'}</span>`
          :poor?`<span class="muted" style="font-size:11px">faltan créditos (◈ ${cost})</span>`
@@ -4100,9 +4106,10 @@ function itGive(i){
   const sel=document.getElementById('itTarget'); const id=sel&&sel.value; if(!id)return;
   const [k,e0]=itPool()[i]||[]; if(!e0)return;
   const ch=copyChar(id); if(!ch)return;
-  const charge=document.getElementById('itCharge').checked;
-  const cost=charge&&e0.credit!=null?+e0.credit:0;
-  if(cost>(+ch.gold||0)){setStatus('No le alcanzan los créditos.');return;}
+  const gm=(ME.isHost||!ME.peer);
+  if(!gm&&!gradeAllowed(e0,ch)){setStatus('Sin acceso a ese grado.');return;}
+  const cost=!gm&&e0.credit!=null?+e0.credit:0;
+  if(cost>(+ch.gold||0)){setStatus('No te alcanzan los créditos.');return;}
   const e=JSON.parse(JSON.stringify(e0)); delete e.used;
   ch.gear=ch.gear||[]; ch.gear.push(e); if(cost)ch.gold=(+ch.gold||0)-cost;
   dispatch({kind:'upchar',char:ch});
