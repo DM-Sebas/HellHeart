@@ -173,7 +173,14 @@
   .ehot{position:absolute;pointer-events:auto;cursor:pointer;background:transparent}
   .ehot:hover{background:rgba(214,166,74,.4)}
   .token{position:absolute;border-radius:50%;border:2px solid #000;display:flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:12px;color:#000;pointer-events:auto;cursor:grab;user-select:none;box-shadow:0 2px 5px rgba(0,0,0,.5);text-shadow:0 1px 0 rgba(255,255,255,.4)}
+    font-weight:700;font-size:12px;color:#000;pointer-events:auto;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;box-shadow:0 2px 5px rgba(0,0,0,.5);text-shadow:0 1px 0 rgba(255,255,255,.4)}
+  .tokmenu{position:fixed;z-index:300;background:#201a14;border:1px solid var(--gold);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+  .tokmenu .tt{font-weight:700;color:var(--gold);font-size:13px}
+  .tokmenu select{width:100%}
+  .uses{display:flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;flex-wrap:wrap}
+  .uses .pip{width:14px;height:14px;border-radius:50%;border:1px solid var(--gold);display:inline-block;cursor:pointer}
+  .uses .pip.on{background:var(--gold)}
+  .uses .pip.ro{cursor:default}
   .token.dragging{cursor:grabbing;z-index:50;opacity:.85}
   .expand{position:absolute;z-index:20;background:rgba(20,14,10,.9);border:1px solid var(--gold);color:var(--gold)}
   .expand.t{top:6px;left:50%;transform:translateX(-50%)}
@@ -1001,7 +1008,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v13.9';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.0';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1730,6 +1737,7 @@ function apply(a){
          evalúa el GM, que es quien tiene el estado bueno, y se difunde a la mesa. */
       if(ME.isHost||!ME.peer)setTimeout(()=>roomProximityReveal(a.r,a.c),0);} break;}
     case 'deltoken': STATE.tokens=STATE.tokens.filter(t=>t.id!==a.id); break;
+    case 'tokenset':{const t=STATE.tokens.find(t=>t.id===a.id); if(t)Object.assign(t,a.patch||{}); break;}
     case 'upchar':{const isNew=!STATE.characters[a.char.id];
       if(isNew&&a.char.owner&&a.char.owner!==ME.id&&Object.values(STATE.characters).some(c=>c.owner===a.char.owner))break;
       STATE.characters[a.char.id]=a.char;
@@ -2025,16 +2033,56 @@ function equipmentSection(ch,ed){
   if(ch.secondary)h+=equipCardHTML(ch.secondary,ch,ed,'secondary','weapon');
   h+=`</div><div class="row" style="justify-content:space-between"><b>Items</b>${ed?`<button class="xs" onclick="openEquip('${ch.id}','gear')">+ item</button> <button class="xs" onclick="customItem('${ch.id}')">+ custom</button>`:''}</div>`;
   h+=`<div class="cardgrid" style="margin:6px 0">`;
-  (ch.gear||[]).forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,'item'));
+  (ch.gear||[]).forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,isWeaponItem(it)?'weapon':'item'));
   h+=`</div>`;
   return h;
 }
+function isWeaponItem(e){return !!(e&&(e.type==='Primary'||e.type==='Secondary')&&e.damageDice);}
+function costBadges(e){return (e.tier?`<span class="badge lvl">T${e.tier}</span> `:'')+(e.credit!=null?`<span class="badge">◈ ${e.credit}</span>`:'');}
+/* v14: usos de consumibles. Sale del nombre («(3)», «(3 rds)») o de un valor por defecto;
+   se puede ajustar en la tarjeta con − / +. */
+const USES_DEFAULT={'consecrated warding chalk':3,'thermite breach pen':3};
+function usesOf(e){
+  if(e.uses!=null)return +e.uses||0;
+  const m=String(e.name||'').match(/\((\d+)\s*(?:rds?|uses?)?\)/i); if(m)return +m[1];
+  return USES_DEFAULT[String(e.name||'').toLowerCase()]||0;
+}
+function usesHTML(e,ch,ed,slot){
+  if(!slot.startsWith('gear:'))return '';
+  const n=usesOf(e), used=Math.min(n,+e.used||0);
+  if(!n&&(!ed||isWeaponItem(e)))return '';
+  let p='';
+  for(let k=0;k<n;k++)p+=`<span class="pip${k<used?' on':''}${ed?'':' ro'}"${ed?` onclick="useToggle('${ch.id}','${slot}',${k})"`:''} title="${k<used?'usado':'disponible'}"></span>`;
+  return `<div class="uses"><span class="muted">Usos${n?` ${n-used}/${n}`:''}:</span>${p}${ed?`<button class="xs" onclick="usesAdj('${ch.id}','${slot}',-1)" title="un uso menos">−</button><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="un uso más">+</button>`:''}</div>`;
+}
+function gearRef(ch,slot){const i=+slot.split(':')[1]; return ch.gear&&ch.gear[i];}
+function useToggle(id,slot,k){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return;
+  const used=+e.used||0; e.used=(k<used)?k:k+1; if(e.uses==null)e.uses=usesOf(e); dispatch({kind:'upchar',char:ch});}
+function usesAdj(id,slot,d){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return;
+  e.uses=Math.max(0,Math.min(12,usesOf(e)+d)); e.used=Math.min(e.uses,+e.used||0); dispatch({kind:'upchar',char:ch});}
+/* v14: un arma que llevas en el inventario se puede equipar; la que estaba vuelve al inventario */
+function equipFromGear(id,i,slot){
+  const ch=copyChar(id); const e=ch.gear&&ch.gear[i]; if(!e)return;
+  if(slot==='secondary'&&ch.primary&&ch.primary.burden==='Two-Handed'){setStatus('Tu primaria es a dos manos: cámbiala primero.');return;}
+  ch.gear.splice(i,1); if(ch[slot])ch.gear.push(ch[slot]); ch[slot]=e;
+  if(slot==='primary'&&e.burden==='Two-Handed'&&ch.secondary){ch.gear.push(ch.secondary); ch.secondary=null; flash('Arma a dos manos: la secundaria pasó al inventario.');}
+  dispatch({kind:'upchar',char:ch});
+}
+function stowWeapon(id,slot){const ch=copyChar(id); if(!ch[slot])return; ch.gear=ch.gear||[]; ch.gear.push(ch[slot]); ch[slot]=null; dispatch({kind:'upchar',char:ch});}
 function equipCardHTML(e,ch,ed,slot,kind){
   const mods=[]; if(e.evasionMod)mods.push((e.evasionMod>0?'+':'')+e.evasionMod+' Eva'); if(e.majorMod)mods.push((e.majorMod>0?'+':'')+e.majorMod+' Maj'); if(e.severeMod)mods.push((e.severeMod>0?'+':'')+e.severeMod+' Sev'); if(e.scoreMod)mods.push((e.scoreMod>0?'+':'')+e.scoreMod+' Arm');
-  return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span class="badge eqp">equipped</span></div>
+  const inGear=slot.startsWith('gear:'), gi=inGear?+slot.split(':')[1]:-1;
+  let acts='';
+  if(ed){
+    if(inGear&&kind==='weapon')acts+=`<button class="xs" onclick="equipFromGear('${ch.id}',${gi},'${e.type==='Secondary'?'secondary':'primary'}')">⇄ equipar como ${e.type==='Secondary'?'secundaria':'primaria'}</button>`;
+    if(!inGear&&kind==='weapon')acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
+    acts+=`<button class="xs danger" onclick="unequip('${ch.id}','${slot}')">${inGear?'quitar':'unequip'}</button>`;
+  }
+  return `<div class="gcard eq"${accentAttr(KIND_COLOR[kind])}><div class="top"><span class="nm">${esc(e.name)}</span><span>${costBadges(e)}<span class="badge eqp">${inGear?(kind==='weapon'?'en inventario':'carried'):'equipped'}</span></span></div>
     <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${gearMetaBadges(e,kind)}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
     ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}
-    ${ed?`<div class="acts"><button class="xs danger" onclick="unequip('${ch.id}','${slot}')">unequip</button></div>`:''}
+    ${usesHTML(e,ch,ed,slot)}
+    ${acts?`<div class="acts">${acts}</div>`:''}
   </div>`;
 }
 function openEquip(id,slot){
@@ -2044,28 +2092,45 @@ function openEquip(id,slot){
   let pool, title;
   if(slot==='armor'){pool=EQUIP.armor.concat(g.armor).filter(a=>(a.tier||1)<=maxT); title='Equip armor (up to Tier '+maxT+')';}
   else if(slot==='primary'||slot==='secondary'){const ty=slot==='primary'?'Primary':'Secondary'; pool=EQUIP.weapons.concat(g.weapons).filter(w=>w.type===ty&&(w.tier||1)<=maxT); title='Equip '+slot+' weapon (up to Tier '+maxT+')';}
-  else {pool=EQUIP.items.concat(g.items); title='Add item';}
+  else {pool=EQUIP.items.concat(g.items).concat(EQUIP.weapons.concat(g.weapons).filter(w=>(w.tier||1)<=maxT)); title='Add item (objetos y armas para llevar en el inventario)';}
   const box=document.getElementById('genBox'); box.classList.add('wide');
-  window.__equip={id,slot,pool};
+  window.__equip={id,slot,pool,maxT};
   box.innerHTML='<h3 style="color:var(--gold)">'+title+'</h3>'
     +'<input id="eqSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterEquip()">'
     +'<div id="eqList" style="max-height:54vh;overflow:auto"></div>'
     +'<div class="row" style="margin-top:8px;justify-content:flex-end"><button class="sm" onclick="closeGen()">Cancel</button></div>';
   document.getElementById('genModal').classList.add('show'); filterEquip();
 }
+/* v14: la búsqueda ignora mayúsculas, tildes y guiones («cold iron» encuentra «Cold-iron blade»)
+   y cada palabra se busca por separado. Si no está en esta lista, dice dónde está. */
+function normQ(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
+function eqHay(e){return normQ(e.name+' '+(e.feature||e.text||'')+' '+(e.trait||'')+' '+(e.category||'')+' '+(e.type||''));}
+function eqMatch(e,q){if(!q)return true; const h=eqHay(e); return q.split(' ').every(w=>h.includes(w));}
 function filterEquip(){
-  const {pool,slot}=window.__equip; const q=(document.getElementById('eqSearch').value||'').toLowerCase();
-  const items=pool.filter(e=>!q||(e.name+' '+(e.feature||e.text||'')+' '+(e.trait||'')).toLowerCase().includes(q));
-  document.getElementById('eqList').innerHTML=items.map(e=>{
+  const {pool,slot,maxT}=window.__equip; const q=normQ(document.getElementById('eqSearch').value);
+  const items=pool.filter(e=>eqMatch(e,q));
+  let html=items.map(e=>{
     const idx=pool.indexOf(e);
+    const isW=isWeaponItem(e);
     let sub = slot==='armor'?`Major ${e.baseMajor} / Severe ${e.baseSevere} / Score ${e.baseScore}` :
-      (e.trait?`${e.trait} · ${e.range} · ${e.damageDice}${e.damageBonus?'+'+e.damageBonus:''} ${e.damageType||''} · ${e.burden}`:(e.category||''));
+      (e.trait?`${e.trait} · ${e.range} · ${e.damageDice}${e.damageBonus?'+'+e.damageBonus:''} ${e.damageType||''} · ${e.burden}`:'');
     const mods=[]; if(e.evasionMod)mods.push((e.evasionMod>0?'+':'')+e.evasionMod+' Eva'); if(e.scoreMod)mods.push((e.scoreMod>0?'+':'')+e.scoreMod+' Arm'); if(e.majorMod)mods.push('+'+e.majorMod+' Maj'); if(e.severeMod)mods.push('+'+e.severeMod+' Sev');
+    const tags=(isW?tintBadge(e.type,wTypeColor(e.type)):'')+(e.category?tintBadge(e.category,categoryColor(e.category)):'');
+    const nU=usesOf(e);
     return `<div class="opt" onclick="pickEquip(${idx})"><div>
-      <b style="color:var(--gold)">${esc(e.name)}</b> ${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}
-      <div class="muted" style="font-size:12px">${esc(sub)}</div>
-      ${(e.feature||e.text)?`<div class="muted" style="font-size:11px;margin-top:2px">${esc((e.feature||e.text).slice(0,120))}</div>`:''}</div></div>`;
-  }).join('')||'<p class="muted">No matches.</p>';
+      <b style="color:var(--gold)">${esc(e.name)}</b> ${costBadges(e)}${tags}${nU?`<span class="badge">${nU} usos</span>`:''} ${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}
+      ${sub?`<div class="muted" style="font-size:12px">${esc(sub)}</div>`:''}
+      ${(e.feature||e.text)?`<div class="muted" style="font-size:11px;margin-top:2px">${esc((e.feature||e.text).slice(0,140))}</div>`:''}</div></div>`;
+  }).join('');
+  if(q){
+    const g=CG();
+    const all=[].concat(EQUIP.weapons,g.weapons,EQUIP.items,g.items,EQUIP.armor,g.armor);
+    const elsewhere=all.filter(e=>!pool.includes(e)&&eqMatch(e,q));
+    if(elsewhere.length)html+='<p class="muted" style="font-size:12px;margin-top:8px">También aparece fuera de esta lista: '
+      +elsewhere.slice(0,6).map(e=>'<b>'+esc(e.name)+'</b> ('+(isWeaponItem(e)?'arma '+(e.type==='Secondary'?'secundaria':'primaria'):e.baseScore!=null?'armadura':'objeto')+(e.tier?' T'+e.tier:'')+((e.tier||1)>maxT?', sobre tu tier':'')+')').join(', ')
+      +'. Búscalo en el botón que corresponde.</p>';
+  }
+  document.getElementById('eqList').innerHTML=html||'<p class="muted">No matches.</p>';
 }
 function pickEquip(idx){
   const {id,slot,pool}=window.__equip; const e=JSON.parse(JSON.stringify(pool[idx])); const ch=copyChar(id);
@@ -2532,7 +2597,7 @@ function toggleAdv(i){const L=window.__lvl; const o=L.td.options[i]; const cost=
   document.querySelectorAll('#lvlopts .opt').forEach(el=>{const idx=+el.dataset.i; el.classList.toggle('sel',L.sel.includes(idx)); const cb=el.querySelector('input'); if(cb)cb.checked=L.sel.includes(idx);});
   document.getElementById('slotInfo').textContent=used+' / 2 slots'; document.getElementById('lvlConfirm').disabled=(used!==2);}
 function confirmLevel(){
-  const L=window.__lvl; work=copyChar(L.id); const target=L.target; const picks=L.sel.map(i=>L.td.options[i].effect);
+  const L=window.__lvl; work=copyChar(L.id); window.__lvlBase=copyChar(L.id); const target=L.target; const picks=L.sel.map(i=>L.td.options[i].effect);
   if([2,5,8].includes(target)){ work.proficiency=(work.proficiency||1)+1; work.experiences=(work.experiences?work.experiences+'; ':'')+'New Experience (+2) @Lv'+target; if(target>=5)work.markedTraits=[]; }
   let traitPicks=0,cardPicks=1,wantMulti=false;
   picks.forEach(e=>{ if(e==='hpslot')work.hpmax=Math.min(12,work.hpmax+1); else if(e==='stressslot')work.stressmax=Math.min(12,work.stressmax+1);
@@ -2544,7 +2609,13 @@ function confirmLevel(){
   closeGen(); processStep();
 }
 function processStep(){
-  if(stepQueue.length===0){ dispatch({kind:'upchar',char:work}); log(null,work.name,` reaches level ${work.level}!`,true); work=null; return; }
+  if(stepQueue.length===0){
+    /* v14: se aplica solo lo que cambió la subida de nivel sobre la hoja ACTUAL. Antes se
+       mandaba la copia vieja entera y borraba lo que se hubiera equipado entremedio. */
+    const base=window.__lvlBase, cur=copyChar(work.id);
+    if(base&&cur){Object.keys(work).forEach(k=>{if(JSON.stringify(work[k])!==JSON.stringify(base[k]))cur[k]=work[k];}); work=cur;}
+    window.__lvlBase=null;
+    dispatch({kind:'upchar',char:work}); log(null,work.name,` reaches level ${work.level}!`,true); work=null; return; }
   const step=stepQueue.shift();
   if(step.type==='traits')stepTraits(); else if(step.type==='multiclass')stepMulti(); else if(step.type==='card')stepCard();
 }
@@ -2895,7 +2966,7 @@ function renderTokens(){
     if(!__gm&&!__mine&&cellHiddenByRoom(t.r,t.c))return;
     const el=document.createElement('div'); el.className='token'; el.textContent=t.label||'';
     el.style.width=el.style.height=(cell-4)+'px'; el.style.left=(t.c*cell+2)+'px'; el.style.top=(t.r*cell+2)+'px'; el.style.background=t.color||'#b5443b'; el.dataset.id=t.id;
-    el.title='double-click: range rings';
+    el.title='doble clic: anillos de rango · clic derecho o mantener apretado: menú (borrar, quién lo mueve)';
     el.ondblclick=(e)=>{e.stopPropagation(); window.__ringToken=(window.__ringToken===t.id?null:t.id); renderTokens();};
     const canMove=ME.isHost||t.owner===ME.id||(t.charId&&STATE.characters[t.charId]&&STATE.characters[t.charId].owner===ME.id);
     if(canMove&&mapMode!=='edges')makeDraggable(el,t); else el.style.cursor='default'; layer.appendChild(el);});
@@ -2914,23 +2985,61 @@ function renderTokens(){
     });
   }
 }
+function canEditToken(t){
+  if(ME.isHost||!ME.peer)return true;
+  return t.owner===ME.id||(t.charId&&STATE.characters[t.charId]&&STATE.characters[t.charId].owner===ME.id);
+}
+function closeTokMenu(){const m=document.getElementById('tokMenu'); if(m)m.remove();}
+/* v14: menú del token (clic derecho o mantener apretado en touch). Antes no había forma
+   de borrar un token desde la mesa, y los tokens que ponía el GM no los podía mover nadie. */
+function tokenMenu(t,x,y){
+  closeTokMenu(); if(!canEditToken(t))return;
+  const gm=(ME.isHost||!ME.peer);
+  const m=document.createElement('div'); m.className='tokmenu'; m.id='tokMenu';
+  let h='<div class="tt">'+esc(t.label||'token')+'</div>'
+    +'<button class="xs" onclick="window.__ringToken=(window.__ringToken===\''+t.id+'\'?null:\''+t.id+'\');closeTokMenu();renderTokens()">◎ anillos de rango</button>';
+  if(gm){
+    const opts=Object.values(STATE.characters).filter(c=>c.owner&&c.owner!=='gm');
+    h+='<label class="muted" style="font-size:11px">lo mueve:</label><select onchange="dispatch({kind:\'tokenset\',id:\''+t.id+'\',patch:{charId:this.value||null}});closeTokMenu()">'
+      +'<option value="">solo el GM</option>'
+      +opts.map(c=>'<option value="'+c.id+'"'+(t.charId===c.id?' selected':'')+'>'+esc(c.name||'PJ')+(c.playerName?' ('+esc(c.playerName)+')':'')+'</option>').join('')
+      +'</select>';
+  }
+  h+='<button class="xs danger" onclick="dispatch({kind:\'deltoken\',id:\''+t.id+'\'});closeTokMenu()">🗑 borrar token</button>'
+    +'<button class="xs" onclick="closeTokMenu()">cerrar</button>';
+  m.innerHTML=h; document.body.appendChild(m);
+  const r=m.getBoundingClientRect();
+  m.style.left=Math.max(6,Math.min(window.innerWidth-r.width-6,x))+'px';
+  m.style.top=Math.max(6,Math.min(window.innerHeight-r.height-6,y))+'px';
+  setTimeout(()=>document.addEventListener('pointerdown',function off(ev){if(!m.contains(ev.target)){closeTokMenu();document.removeEventListener('pointerdown',off,true);}},true),0);
+}
 function makeDraggable(el,t){
-  el.addEventListener('pointerdown',e=>{e.preventDefault();
+  el.addEventListener('contextmenu',e=>{e.preventDefault(); e.stopPropagation(); tokenMenu(t,e.clientX,e.clientY);});
+  el.addEventListener('pointerdown',e=>{e.preventDefault(); e.stopPropagation();
+    if(e.button===2)return;
     const now=Date.now();
     if(window.__tap&&window.__tap.id===t.id&&now-window.__tap.ts<400){window.__tap=null;
       window.__ringToken=(window.__ringToken===t.id?null:t.id); renderTokens(); return;}
     window.__tap={id:t.id,ts:now};
     const {cell}=STATE.grid;
+    const x0=e.clientX, y0=e.clientY; let moved=false, done=false;
     window.__dragging=true;
-    el.classList.add('dragging'); el.setPointerCapture(e.pointerId);
+    el.classList.add('dragging'); try{el.setPointerCapture(e.pointerId);}catch(_){}
     const rect=()=>document.getElementById('mapstage').getBoundingClientRect();
-    function mv(ev){const r=rect(); el.style.left=((ev.clientX-r.left)/mapZoom-cell/2)+'px'; el.style.top=((ev.clientY-r.top)/mapZoom-cell/2)+'px';}
-    function up(ev){el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); el.classList.remove('dragging');
-      window.__dragging=false;
+    /* mantener apretado ~0,55 s sin moverse = menú del token (para touch) */
+    const lp=setTimeout(()=>{ if(moved||done)return; finish(null); tokenMenu(t,x0,y0); },550);
+    function mv(ev){ if(!moved&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<6)return; moved=true;
+      const r=rect(); el.style.left=((ev.clientX-r.left)/mapZoom-cell/2)+'px'; el.style.top=((ev.clientY-r.top)/mapZoom-cell/2)+'px';}
+    function finish(ev){ if(done)return; done=true; clearTimeout(lp);
+      el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',cancel);
+      el.classList.remove('dragging'); window.__dragging=false;
+      if(!ev||!moved){ el.style.left=(t.c*cell+2)+'px'; el.style.top=(t.r*cell+2)+'px'; return; }
       const r=rect();
       let c=Math.round(((ev.clientX-r.left)/mapZoom-cell/2)/cell), rr=Math.round(((ev.clientY-r.top)/mapZoom-cell/2)/cell);
       c=Math.max(0,Math.min(STATE.grid.cols-1,c)); rr=Math.max(0,Math.min(STATE.grid.rows-1,rr)); dispatch({kind:'movetoken',id:t.id,r:rr,c});}
-    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up);});
+    function up(ev){finish(ev);}
+    function cancel(){finish(null);}
+    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',cancel);});
 }
 function penColor(){const i=document.getElementById('penColor'); return (i&&i.value)||'#ffd24a';}
 function canErase(s){return ME.isHost||!s.owner||s.owner===ME.id;}
