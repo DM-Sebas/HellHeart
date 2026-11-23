@@ -683,7 +683,7 @@
       <div class="row" style="margin-top:6px">
         <select id="eb-kind" onchange="ebKind()"><option value="weapon">Weapon</option><option value="armor">Armor</option><option value="item">Item</option></select>
         <input id="eb-name" placeholder="name" style="flex:1">
-        Tier <input id="eb-tier" type="number" value="1" min="1" max="4" style="width:50px">
+        Grado <select id="eb-tier" title="tier del equipo (SRD §7.3): fija el costo en créditos y quién lo puede sacar"><option value="M">Mundane · ◈1</option><option value="D">D · ◈2</option><option value="C">C · ◈3</option><option value="B">B · ◈4</option><option value="A">A · ◈5</option><option value="S">S · solo GM</option></select>
       </div>
       <div class="row" id="eb-weapon" style="margin-top:6px">
         <select id="eb-type"><option>Primary</option><option>Secondary</option></select>
@@ -1021,7 +1021,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.2';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.3';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -4361,8 +4361,8 @@ function ccRender(){
   } else if(cc.step===6){
     h+='<p class="muted" style="font-size:12px">Starting equipment (Tier 1). Thresholds and Evasion compute from this.</p>'
      +'<div class="col"><label>Armor</label><select id="cc-arm"><option value="">none</option>'+EQUIP.armor.map(function(a,i){return (a.tier||1)===1?('<option value="'+i+'" '+(String(d.armor)===String(i)?'selected':'')+'>'+a.name+' ('+a.baseMajor+'/'+a.baseSevere+', score '+a.baseScore+')</option>'):'';}).join('')+'</select></div>'
-     +'<div class="col" style="margin-top:6px"><label>Primary weapon</label><select id="cc-pri" onchange="ccPriChange()"><option value="">none</option>'+EQUIP.weapons.map(function(w,i){return (w.type==='Primary'&&(w.tier||1)===1)?('<option value="'+i+'" '+(String(d.primary)===String(i)?'selected':'')+'>'+w.name+' ('+w.trait+', '+w.range+', '+w.damageDice+(w.damageBonus?'+'+w.damageBonus:'')+', '+w.burden+')</option>'):'';}).join('')+'</select></div>'
-     +'<div class="col" style="margin-top:6px"><label>Secondary (unavailable with a Two-Handed primary)</label><select id="cc-sec"><option value="">none</option>'+EQUIP.weapons.map(function(w,i){return (w.type==='Secondary'&&(w.tier||1)===1)?('<option value="'+i+'" '+(String(d.secondary)===String(i)?'selected':'')+'>'+w.name+'</option>'):'';}).join('')+'</select></div>';
+     +'<div class="col" style="margin-top:6px"><label>Primary weapon</label><select id="cc-pri" onchange="ccPriChange()"><option value="">none</option>'+EQUIP.weapons.map(function(w,i){return (w.type==='Primary'&&gradeAllowed(w,{level:1}))?('<option value="'+i+'" '+(String(d.primary)===String(i)?'selected':'')+'>'+w.name+' ('+w.trait+', '+w.range+', '+w.damageDice+(w.damageBonus?'+'+w.damageBonus:'')+', '+w.burden+')</option>'):'';}).join('')+'</select></div>'
+     +'<div class="col" style="margin-top:6px"><label>Secondary (unavailable with a Two-Handed primary)</label><select id="cc-sec"><option value="">none</option>'+EQUIP.weapons.map(function(w,i){return (w.type==='Secondary'&&gradeAllowed(w,{level:1}))?('<option value="'+i+'" '+(String(d.secondary)===String(i)?'selected':'')+'>'+w.name+'</option>'):'';}).join('')+'</select></div>';
   }
   h+='<div class="row" style="margin-top:12px;justify-content:space-between">'
    +'<span><button class="sm" onclick="closeGen()">cancel</button>'+(cc.step>1?' <button class="sm" onclick="ccNav(-1)">← back</button>':'')+'</span>'
@@ -4513,10 +4513,10 @@ function ebKind(){const k=val('eb-kind');
 function ebSave(){
   const k=val('eb-kind'); const name=val('eb-name'); if(!name){flash('Name it first.');return;}
   const g=JSON.parse(JSON.stringify(CG()));
-  const tier=+val('eb-tier')||1, eva=+val('eb-eva')||0, feat=val('eb-feat');
-  if(k==='weapon')g.weapons.push({id:rid(4),custom:true,name,tier,type:val('eb-type'),trait:val('eb-trait'),range:val('eb-range'),damageDice:val('eb-dice')||'d6',damageBonus:+val('eb-bonus')||0,damageType:val('eb-dtype'),burden:val('eb-burden'),feature:feat,evasionMod:eva});
-  else if(k==='armor')g.armor.push({id:rid(4),custom:true,name,tier,baseMajor:+val('eb-major')||0,baseSevere:+val('eb-severe')||0,baseScore:+val('eb-score')||0,feature:feat,evasionMod:eva});
-  else g.items.push({id:rid(4),custom:true,name,category:'Custom',text:feat,evasionMod:eva,majorMod:0,severeMod:0,scoreMod:0});
+  const grade=val('eb-tier')||'M', credit=grade==='S'?null:GRADES.indexOf(grade)+1, eva=+val('eb-eva')||0, feat=val('eb-feat');
+  if(k==='weapon')g.weapons.push({id:rid(4),custom:true,name,grade,credit,type:val('eb-type'),trait:val('eb-trait'),range:val('eb-range'),damageDice:val('eb-dice')||'d6',damageBonus:+val('eb-bonus')||0,damageType:val('eb-dtype'),burden:val('eb-burden'),feature:feat,evasionMod:eva});
+  else if(k==='armor')g.armor.push({id:rid(4),custom:true,name,grade,credit,baseMajor:+val('eb-major')||0,baseSevere:+val('eb-severe')||0,baseScore:+val('eb-score')||0,feature:feat,evasionMod:eva});
+  else g.items.push({id:rid(4),custom:true,name,grade,credit,category:'Custom',text:feat,evasionMod:eva,majorMod:0,severeMod:0,scoreMod:0});
   dispatch({kind:'customgear',gear:g}); setVal('eb-name',''); setVal('eb-feat',''); flash(name+' added to the shared catalog');}
 function ebDel(kind,id){const g=JSON.parse(JSON.stringify(CG()));
   if(kind==='weapon')g.weapons=g.weapons.filter(x=>x.id!==id);
@@ -4525,7 +4525,7 @@ function ebDel(kind,id){const g=JSON.parse(JSON.stringify(CG()));
   dispatch({kind:'customgear',gear:g});}
 function renderEbList(){const box=document.getElementById('ebList'); if(!box)return;
   const g=CG(); const all=[...g.weapons.map(w=>['weapon',w]),...g.armor.map(a=>['armor',a]),...g.items.map(t=>['item',t])];
-  box.innerHTML=all.length?all.map(p=>'<span class="pill" style="margin:2px"><b>'+esc(p[1].name)+'</b> <span class="muted" style="font-size:10px">T'+(p[1].tier||1)+' '+p[0]+'</span> <button class="xs danger" onclick="ebDel(\''+p[0]+'\',\''+p[1].id+'\')">✕</button></span>').join(' ')
+  box.innerHTML=all.length?all.map(p=>'<span class="pill" style="margin:2px"><b>'+esc(p[1].name)+'</b> <span class="muted" style="font-size:10px">'+(gradeOf(p[1])?(gradeOf(p[1])==='M'?'Mundane':gradeOf(p[1])+'-tier'):'')+' '+p[0]+'</span> <button class="xs danger" onclick="ebDel(\''+p[0]+'\',\''+p[1].id+'\')">✕</button></span>').join(' ')
    :'<span class="muted" style="font-size:12px">No custom gear yet — saved gear appears in every player\'s equip picker.</span>';}
 
 function openRoom(){
