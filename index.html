@@ -1021,7 +1021,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.1';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.2';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -2051,14 +2051,37 @@ function equipmentSection(ch,ed){
   return h;
 }
 function isWeaponItem(e){return !!(e&&(e.type==='Primary'||e.type==='Secondary')&&e.damageDice);}
-function costBadges(e){return (e.tier?`<span class="badge lvl">T${e.tier}</span> `:'')+(e.credit!=null?`<span class="badge">◈ ${e.credit}</span>`:'');}
+function costBadges(e){return gradeBadge(e)+(e.credit!=null?`<span class="badge">◈ ${e.credit}</span>`:'');}
 /* v14: usos de consumibles. Sale del nombre («(3)», «(3 rds)») o de un valor por defecto;
    se puede ajustar en la tarjeta con − / +. */
-const USES_DEFAULT={'consecrated warding chalk':3,'thermite breach pen':3};
+/* v14.2 — PulpHeart SRD v1.0 §7.3–7.5: los tiers del equipo van con LETRA
+   (Mundane < D < C < B < A < S), no con el T1–T4 de los personajes. Costo lineal:
+   Mundane 1 · D 2 · C 3 · B 4 · A 5. Acceso por tier del personaje: T1 Mundane y D ·
+   T2 +C · T3 +B · T4 +A · S solo lo da el GM. Desde C hay Overwhelm Roll (C 13 · B 17 ·
+   A 21 · S 25). Grado y usos salen de la tabla del catálogo; si un objeto no está
+   en la tabla, el grado se deduce del costo. */
+const SRD_GEAR={"holdout pistol": ["M", "∞"], "pump shotgun": ["M", "∞"], "hunting rifle": ["M", "∞"], "combat knife set": ["M", "∞"], "blackjack & restraints": ["M", "∞"], "riot shield": ["M", "∞"], "spare flak vest": ["M", "∞"], "smoke grenades (3)": ["M", "3×"], "flare gun + flares": ["M", "3×"], "unmarked sedan": ["M", "∞"], "combat carbine": ["D", "∞"], "suppressed pistol": ["D", "∞"], "sniper rifle": ["D", "∞"], "frag grenades (2)": ["D", "2×"], "silver-tipped rounds (1 mag)": ["D", "1 mag"], "incendiary rounds (1 mag)": ["D", "1 mag"], "tear gas grenades (2)": ["D", "2×"], "breaching rounds (4)": ["D", "4×"], "armored car": ["D", "∞"], "ballistic shield": ["D", "∞"], "combat shotgun": ["D", "∞"], "c4 charge + detonator": ["C", "1×"], "submachine gun": ["C", "∞"], "grenade launcher (3 rds)": ["C", "3×"], "claymore mines (2)": ["C", "2×"], "cold-iron blade": ["C", "∞"], "blessed combat knife": ["C", "∞"], "dragon's-breath rounds (4)": ["C", "4×"], "anti-materiel rounds (1 mag)": ["C", "1 mag"], "gun truck": ["C", "∞"], "riot control kit": ["C", "∞"], "field camera + film": ["M", "∞"], "tape recorder": ["M", "∞"], "lockpick set": ["M", "∞"], "binoculars": ["M", "∞"], "geiger counter": ["M", "∞"], "walkie-talkie pair": ["M", "∞"], "basic toolbox": ["M", "∞"], "instant camera": ["M", "∞"], "wiretap kit": ["M", "∞"], "chemical test kit": ["M", "∞"], "tactical comms kit": ["D", "∞"], "starlight scope": ["D", "∞"], "surveillance kit": ["D", "∞"], "emf wyrd-reader": ["D", "∞"], "portable generator + floodlights": ["D", "∞"], "field darkroom": ["D", "∞"], "motion sensors (4)": ["D", "4×"], "thermite breach pen": ["D", "3×"], "forensics field kit": ["D", "∞"], "uv/ir dual lamp": ["D", "∞"], "field hacking kit": ["C", "∞"], "tracking transponders (3)": ["C", "3×"], "operational stimulants": ["C", "3×"], "aetheric resonance scanner": ["C", "∞"], "voice-stress analyzer": ["C", "∞"], "signal jammer": ["C", "2×"], "cryo-foam canister": ["C", "2×"], "wyrd battery cell": ["C", "2×"], "surveillance van": ["C", "∞"], "disguise prosthetics kit": ["C", "∞"], "bulk salt supply": ["M", "∞"], "iron filings pouch": ["M", "∞"], "holy symbols assortment": ["M", "∞"], "consecration candles": ["M", "∞"], "chalk + sigil stencils": ["M", "∞"], "regional folklore guide": ["M", "∞"], "prayer beads": ["M", "1/session"], "silvered hand mirrors (3)": ["M", "3×"], "grave dirt & crossroads dust": ["M", "3×"], "witch bottle (prepared)": ["M", "1×"], "holy water vials (3)": ["D", "3×"], "iron salt-cord": ["D", "1×"], "consecrated warding chalk": ["D", "3×"], "saint's candle": ["D", "1×"], "hex-breaking charm": ["D", "1×"], "spirit chimes": ["D", "∞"], "dreamcatcher talisman": ["D", "∞"], "anointing oil (3)": ["D", "3×"], "purifying censer": ["D", "2×"], "witch-hazel dowsing rod": ["D", "1/scene"], "saint's medallion": ["C", "∞"], "standard binding circle kit": ["C", "2×"], "consecrated seance board": ["C", "1/session"], "spirit trap": ["C", "1×"], "relic shard pendant": ["C", "1/scene"], "banishing salts (2)": ["C", "2×"], "true-silver mirror": ["C", "∞"], "sin-eater's bread": ["C", "2×"], "warded lockbox": ["C", "∞"], "pilgrim's torch": ["C", "∞"]};
+const GRADES=['M','D','C','B','A','S'];
+const GRADE_LABEL={M:'Mundane',D:'D-tier',C:'C-tier',B:'B-tier',A:'A-tier',S:'S-tier'};
+const GRADE_OVERWHELM={C:13,B:17,A:21,S:25};
+const GRADE_DREAD={C:'1 Dread/escena (consumible: 1/uso)',B:'1 Dread/uso',A:'2 Dread/uso',S:'3 Dread/uso, +1 cada uso'};
+function srdRow(e){return SRD_GEAR[String(e&&e.name||'').toLowerCase()]||null;}
+function gradeOf(e){
+  if(!e)return null; if(e.grade)return e.grade;
+  const r=srdRow(e); if(r)return r[0];
+  if(e.baseScore!=null)return null;                       // armadura: equipo común, sin grado
+  const c=+e.credit; return c>=1&&c<=5?GRADES[c-1]:null;
+}
+function clearanceOf(ch){const t=tierOf((ch&&ch.level)||1); return t>=4?'A':t===3?'B':t===2?'C':'D';}
+function gradeAllowed(e,ch){const g=gradeOf(e); if(!g)return true; if(g==='S')return false; return GRADES.indexOf(g)<=GRADES.indexOf(clearanceOf(ch));}
+function gradeBadge(e){const g=gradeOf(e); if(!g)return '';
+  return `<span class="badge lvl" title="${GRADE_LABEL[g]}${GRADE_OVERWHELM[g]?' · Overwhelm '+GRADE_OVERWHELM[g]+' · '+GRADE_DREAD[g]:' · sin Dread'}">${g==='M'?'Mundane':g}</span> `;}
+function usesLabel(e){const r=srdRow(e); return r?r[1]:'';}
 function usesOf(e){
   if(e.uses!=null)return +e.uses||0;
-  const m=String(e.name||'').match(/\((\d+)\s*(?:rds?|uses?)?\)/i); if(m)return +m[1];
-  return USES_DEFAULT[String(e.name||'').toLowerCase()]||0;
+  const u=usesLabel(e);
+  if(u){const m=u.match(/^(\d+)\s*(×|mag|\/)/); return m?+m[1]:0;}
+  const m=String(e.name||'').match(/\((\d+)\s*(?:rds?|uses?)?\)/i); return m?+m[1]:0;
 }
 function usesHTML(e,ch,ed,slot){
   if(!slot.startsWith('gear:'))return '';
@@ -2066,7 +2089,8 @@ function usesHTML(e,ch,ed,slot){
   if(!n&&(!ed||isWeaponItem(e)))return '';
   let p='';
   for(let k=0;k<n;k++)p+=`<span class="pip${k<used?' on':''}${ed?'':' ro'}"${ed?` onclick="useToggle('${ch.id}','${slot}',${k})"`:''} title="${k<used?'usado':'disponible'}"></span>`;
-  return `<div class="uses"><span class="muted">Usos${n?` ${n-used}/${n}`:''}:</span>${p}${ed?`<button class="xs" onclick="usesAdj('${ch.id}','${slot}',-1)" title="un uso menos">−</button><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="un uso más">+</button>`:''}</div>`;
+  const ul=usesLabel(e), per=/\//.test(ul)?' ('+ul.replace('scene','escena').replace('session','sesión')+')':/mag/.test(ul)?' (cargador)':'';
+  return `<div class="uses"><span class="muted">Usos${n?` ${n-used}/${n}`:''}${per}:</span>${p}${ed?`<button class="xs" onclick="usesAdj('${ch.id}','${slot}',-1)" title="un uso menos">−</button><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="un uso más">+</button>`:''}</div>`;
 }
 function gearRef(ch,slot){const i=+slot.split(':')[1]; return ch.gear&&ch.gear[i];}
 function useToggle(id,slot,k){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return;
@@ -2105,9 +2129,9 @@ function openEquip(id,slot){
   if(slot==='secondary'&&ch.primary&&ch.primary.burden==='Two-Handed'){setStatus('Your primary weapon is Two-Handed — unequip or change it to use a secondary.');return;}
   const maxT=tierOf(ch.level); const g=CG();
   let pool, title;
-  if(slot==='armor'){pool=EQUIP.armor.concat(g.armor).filter(a=>(a.tier||1)<=maxT); title='Equip armor (up to Tier '+maxT+')';}
-  else if(slot==='primary'||slot==='secondary'){const ty=slot==='primary'?'Primary':'Secondary'; pool=EQUIP.weapons.concat(g.weapons).filter(w=>w.type===ty&&(w.tier||1)<=maxT); title='Equip '+slot+' weapon (up to Tier '+maxT+')';}
-  else {pool=EQUIP.items.concat(g.items).concat(EQUIP.weapons.concat(g.weapons).filter(w=>(w.tier||1)<=maxT)); title='Add item (objetos y armas para llevar en el inventario)';}
+  if(slot==='armor'){pool=EQUIP.armor.concat(g.armor); title='Equip armor';}
+  else if(slot==='primary'||slot==='secondary'){const ty=slot==='primary'?'Primary':'Secondary'; pool=EQUIP.weapons.concat(g.weapons).filter(w=>w.type===ty&&gradeAllowed(w,ch)); title='Equip '+slot+' weapon (acceso hasta '+GRADE_LABEL[clearanceOf(ch)]+')';}
+  else {pool=EQUIP.items.concat(g.items).concat(EQUIP.weapons.concat(g.weapons)).filter(e=>gradeAllowed(e,ch)); title='Add item · acceso hasta '+GRADE_LABEL[clearanceOf(ch)];}
   const box=document.getElementById('genBox'); box.classList.add('wide');
   window.__equip={id,slot,pool,maxT};
   box.innerHTML='<h3 style="color:var(--gold)">'+title+'</h3>'
@@ -2142,7 +2166,7 @@ function filterEquip(){
     const all=[].concat(EQUIP.weapons,g.weapons,EQUIP.items,g.items,EQUIP.armor,g.armor);
     const elsewhere=all.filter(e=>!pool.includes(e)&&eqMatch(e,q));
     if(elsewhere.length)html+='<p class="muted" style="font-size:12px;margin-top:8px">También aparece fuera de esta lista: '
-      +elsewhere.slice(0,6).map(e=>'<b>'+esc(e.name)+'</b> ('+(isWeaponItem(e)?'arma '+(e.type==='Secondary'?'secundaria':'primaria'):e.baseScore!=null?'armadura':'objeto')+(e.tier?' T'+e.tier:'')+((e.tier||1)>maxT?', sobre tu tier':'')+')').join(', ')
+      +elsewhere.slice(0,6).map(e=>'<b>'+esc(e.name)+'</b> ('+(isWeaponItem(e)?'arma '+(e.type==='Secondary'?'secundaria':'primaria'):e.baseScore!=null?'armadura':'objeto')+(gradeOf(e)?' '+GRADE_LABEL[gradeOf(e)]:'')+(gradeAllowed(e,STATE.characters[window.__equip.id])?'':', sin acceso')+')').join(', ')
       +'. Búscalo en el botón que corresponde.</p>';
   }
   document.getElementById('eqList').innerHTML=html||'<p class="muted">No matches.</p>';
@@ -3962,10 +3986,13 @@ function catGearCard(e,kind){
   if(e.severeMod)mods.push((e.severeMod>0?'+':'')+e.severeMod+' Sev');
   if(e.scoreMod)mods.push((e.scoreMod>0?'+':'')+e.scoreMod+' Arm');
   return `<div class="gcard"${accentAttr(KIND_COLOR[kind])}>
-    <div class="top"><span class="nm">${esc(e.name)}</span><span>${e.tier?`<span class="badge lvl">T${e.tier}</span> `:''}${e.credit!=null?`<span class="badge">◈ ${e.credit}</span>`:''}</span></div>
+    <div class="top"><span class="nm">${esc(e.name)}</span><span>${costBadges(e)}</span></div>
     <div class="meta"><span class="badge kind">${kind==='armor'?'Armor':kind==='weapon'?'Weapon':'Item'}</span>${gearMetaBadges(e,kind)}${mods.map(m=>`<span class="badge eqp">${m}</span>`).join('')}</div>
-    ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}</div>`;
+    ${(e.feature||e.text)?`<div class="txt">${esc(e.feature||e.text)}</div>`:''}${overwhelmNote(e)}</div>`;
 }
+function overwhelmNote(e){const g=gradeOf(e); const u=usesLabel(e);
+  const bits=[]; if(u&&u!=='∞')bits.push('Usos: '+u); if(GRADE_OVERWHELM[g])bits.push('Overwhelm '+GRADE_OVERWHELM[g]+' · '+(g==='C'?(u&&u!=='∞'?'1 Dread/uso':'1 Dread/escena'):GRADE_DREAD[g]));
+  return bits.length?`<div class="muted" style="font-size:11px;margin-top:6px">${esc(bits.join(' · '))}</div>`:'';}
 function catFeatCard(nm,txt,cat,label,cls,extra){
   return `<div class="gcard${cat==='foundation'?' t1':cat==='specialization'?' t2':cat==='mastery'?' t3':''}"${accentAttr(featureColor(cat,cls))}>
     <div class="top"><span class="nm">${esc(nm)}</span><span class="badge dom">${esc(label)}</span></div>
@@ -4049,19 +4076,20 @@ function renderItems(){
   const ch=STATE.characters[sel.value]||null;
   const charge=document.getElementById('itCharge').checked;
   document.getElementById('itChips').innerHTML=IT_FILTERS.map(([k,t,col])=>`<button class="chip${itFilter===k?' on':''}" style="--cc:${col||categoryColor(k)||'#c8a24a'}" onclick="itToggle('${k}')">${esc(t)}</button>`).join('')
-    +(ch?`<span class="chipsep"></span><span class="muted" style="font-size:12px">${esc(ch.name||'PJ')} · Tier ${tierOf(ch.level||1)} · ◈ ${+ch.gold||0}</span>`:'');
+    +'<span class="chipsep"></span>'+['M','D','C'].map(g=>`<button class="chip${itFilter==='g:'+g?' on':''}" onclick="itToggle('g:${g}')">${g==='M'?'Mundane':g+'-tier'}</button>`).join('')
+    +(ch?`<span class="chipsep"></span><span class="muted" style="font-size:12px">${esc(ch.name||'PJ')} · Tier ${tierOf(ch.level||1)} · acceso hasta ${GRADE_LABEL[clearanceOf(ch)]} · ◈ ${+ch.gold||0}</span>`:'');
   const q=normQ(document.getElementById('itSearch').value);
   const pool=itPool();
-  const hit=pool.filter(([k,e])=>(!itFilter||itFilter===k||itFilter===e.category)&&eqMatch(e,q));
+  const hit=pool.filter(([k,e])=>(!itFilter||itFilter===k||itFilter===e.category||(itFilter.startsWith('g:')&&gradeOf(e)===itFilter.slice(2)))&&eqMatch(e,q));
   document.getElementById('itCount').textContent=hit.length+' ficha'+(hit.length===1?'':'s');
   list.innerHTML='<div class="cardgrid">'+hit.map(([k,e])=>{
     const i=pool.findIndex(p=>p[1]===e);
     let act='';
     if(ch){
-      const over=(k!=='item')&&(e.tier||1)>tierOf(ch.level||1);
+      const over=!gradeAllowed(e,ch);
       const cost=charge&&e.credit!=null?+e.credit:0, poor=cost>(+ch.gold||0);
       const lbl=gm?'→ enviar a '+esc(ch.name||'PJ'):'+ sacar para mí';
-      act=over?`<span class="muted" style="font-size:11px">sobre el tier de ${esc(ch.name||'PJ')}</span>`
+      act=over?`<span class="muted" style="font-size:11px">${gradeOf(e)==='S'?'S-tier: solo lo da el GM':'sin acceso (Tier '+tierOf(ch.level||1)+' llega hasta '+GRADE_LABEL[clearanceOf(ch)]+')'}</span>`
          :poor?`<span class="muted" style="font-size:11px">faltan créditos (◈ ${cost})</span>`
          :`<button class="xs primary" onclick="itGive(${i})">${lbl}${cost?' · ◈ '+cost:''}</button>`;
     }
