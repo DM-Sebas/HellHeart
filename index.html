@@ -426,6 +426,20 @@
   .modal.show{display:flex}
   .modal .box{background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:18px;width:380px;max-height:88vh;overflow:auto}
   .modal .box.wide{width:680px}
+  /* v14.6: inspección del GM a página completa: Stats | Equipamiento | Rasgos y cartas */
+  .modal:has(.box.full){padding:8px}
+  .modal .box.full{width:calc(100vw - 16px);max-width:none;height:calc(100vh - 16px);max-height:none}
+  .kitA,.kitB{display:flex;flex-direction:column;gap:8px;min-width:0}
+  @media(min-width:900px){
+    .box.full .sh-grid{grid-template-columns:minmax(300px,1fr) minmax(0,2.6fr)}
+    .box.full .sh-kit{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;align-items:start}
+    .box.full .sh-kit>h5{grid-column:1/-1}
+  }
+  /* v14.6: NPC activos con ficha completa */
+  .encgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;margin:6px 0}
+  .enccard{padding:10px}
+  .enccard .feat{font-size:12px;white-space:pre-wrap;margin:3px 0}
+  .enccard .dbtn{padding:0 5px;font-size:11px;line-height:16px;vertical-align:baseline}
   .big{font:700 22px Georgia,serif}
   .opt{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;display:flex;gap:8px;align-items:flex-start}
   .opt:hover{border-color:var(--gold)}
@@ -1021,7 +1035,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.5';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.6';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -2017,10 +2031,11 @@ function renderOneSheet(ch){
         <div class="col"><label>Troubles (Dread scars — GM spends a Fear to invoke for disadvantage)</label><textarea ${dis} rows="3" onchange="editC('${ch.id}','traumas',this.value)" placeholder="one Trouble per line — e.g. The Dark Talks Back">${esc(ch.traumas)}</textarea></div>
       </section>
 
-      <section class="sh-sec sh-kit"><h5>Items &amp; Skills</h5>
+      <section class="sh-sec sh-kit"><h5>Items &amp; Skills</h5><div class="kitA">
         <div class="col"><label>Experiences (+2, spend Hope to use)</label>
           <input ${dis} value="${esc(ch.experiences)}" onchange="editC('${ch.id}','experiences',this.value)" placeholder="e.g. Silver-tongued +2"></div>
         ${equipmentSection(ch,ed)}
+        </div><div class="kitB">
         ${featureCards(ch)}
         <div class="row" style="justify-content:space-between;align-items:center;margin-top:4px">
           <h3 style="color:var(--gold);margin:0">Domain Cards — Loadout <span class="muted" style="font-size:12px">(${(ch.loadout||[]).length}/${LOADOUT_MAX})</span></h3>
@@ -2028,7 +2043,7 @@ function renderOneSheet(ch){
         </div>
         <div class="cardgrid">${(ch.loadout||[]).map(k=>domainCardHTML(findCard(k),ch,ed,'loadout')).join('')}</div>
         ${(ch.loadout||[]).length===0?`<p class="muted" style="font-size:12px;margin:0">No domain cards yet.${cls?'':' Choose a class first.'}</p>`:''}
-      </section>
+      </div></section>
 
     </div>
   </div>
@@ -2138,7 +2153,7 @@ function openEquip(id,slot){
   if(slot==='armor'){pool=EQUIP.armor.concat(g.armor); title='Equip armor';}
   else if(slot==='primary'||slot==='secondary'){const ty=slot==='primary'?'Primary':'Secondary'; pool=EQUIP.weapons.concat(g.weapons).filter(w=>w.type===ty&&gradeAllowed(w,ch)); title='Equip '+slot+' weapon (acceso hasta '+GRADE_LABEL[clearanceOf(ch)]+')';}
   else {pool=EQUIP.items.concat(g.items).concat(EQUIP.weapons.concat(g.weapons)).filter(e=>gradeAllowed(e,ch)); title='Add item · acceso hasta '+GRADE_LABEL[clearanceOf(ch)];}
-  const box=document.getElementById('genBox'); box.classList.add('wide');
+  const box=document.getElementById('genBox'); box.classList.remove('full'); box.classList.add('wide');
   window.__equip={id,slot,pool,maxT};
   box.innerHTML='<h3 style="color:var(--gold)">'+title+'</h3>'
     +'<input id="eqSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterEquip()">'
@@ -2584,7 +2599,7 @@ function openCardPicker(id,dest){
   if(!doms.length){setStatus('Choose a class first.');return;}
   const have=new Set([...ch.loadout,...ch.vault]);
   const pool=availableCards(ch,have);
-  const box=document.getElementById('genBox'); box.classList.add('wide');
+  const box=document.getElementById('genBox'); box.classList.remove('full'); box.classList.add('wide');
   box.innerHTML=`<h3 style="color:var(--gold)">Choose a domain card <span class="muted" style="font-size:12px">(${poolLabel(ch)})</span></h3>
     <input id="cardSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterPicker()">
     <div id="pickerList" style="max-height:52vh;overflow:auto"></div>
@@ -2722,7 +2737,7 @@ function stepCard(){
   const ch=work; const doms=accessibleDomains(ch);
   if(!doms.length){flash('Pick a class to gain cards — skipped.'); processStep(); return;}
   const have=new Set([...ch.loadout,...ch.vault]); const pool=availableCards(ch,have);
-  const box=document.getElementById('genBox'); box.classList.add('wide'); window.__pickerW={pool};
+  const box=document.getElementById('genBox'); box.classList.remove('full'); box.classList.add('wide'); window.__pickerW={pool};
   box.innerHTML=`<h3 style="color:var(--gold)">Gain a domain card <span class="muted" style="font-size:12px">(${poolLabel(ch)})</span></h3>
     <input id="cardSearch" placeholder="search…" style="width:100%;margin:8px 0" oninput="filterPickerWork()"><div id="pickerList" style="max-height:52vh;overflow:auto"></div>`;
   document.getElementById('genModal').classList.add('show'); filterPickerWork();
@@ -3460,17 +3475,46 @@ function stepper(id,field,cur,max){return `<span class="row" style="gap:3px;flex
   <button class="xs" onclick="pcAdj('${id}','${field}',1,${max})">+</button></span>`;}
 function pcAdj(id,field,d,max){const ch=STATE.characters[id]; if(!ch)return; let v=(ch[field]||0)+d; v=Math.max(0,Math.min(max,v)); dispatch({kind:'resource',id,field,value:v});}
 function renderEnc(){
+  /* v14.6: cada NPC activo es una ficha con todo: stats, umbrales, ataque, motivos y
+     rasgos. Ataque (d20 + mod), daño y cualquier dado escrito en los rasgos se tiran
+     con un clic. */
   const box=document.getElementById('encTable'); if(!box)return;
   if(!STATE.encounter.length){box.innerHTML='<p class="muted">No active NPCs. Add them from the NPC tab.</p>'; return;}
-  let h='<table><tr><th>Name</th><th>HP</th><th>Stress</th><th>Diff</th><th>Major</th><th>Severe</th><th>Atk</th><th>Actions</th></tr>';
+  const dl=d=>d.count+'d'+d.sides+(d.mod?((d.mod>0?'+':'')+d.mod):'');
+  let h='<div class="encgrid">';
   STATE.encounter.forEach(n=>{const inInit=STATE.initiative.some(x=>x.refId===n.iid);
-    h+='<tr>'
-    +'<td><b>'+esc(n.name)+'</b> <span class="muted" style="font-size:11px">T'+n.tier+' '+esc(n.type||'')+'</span></td>'
-    +'<td>'+encStep(n.iid,'hp',n.hp,n.hpmax)+'</td>'
-    +'<td>'+encStep(n.iid,'stressNow',n.stressNow,n.stressmax)+'</td>'
-    +'<td>'+n.diff+'</td><td>'+(n.major||'—')+'</td><td>'+(n.severe||'—')+'</td><td>'+(n.atk>=0?'+':'')+n.atk+' '+esc(n.dmg||'')+'</td>'
-    +'<td>'+(inInit?'<button class="xs" disabled>in init</button>':'<button class="xs" onclick="encToInit(\''+n.iid+'\')">→ init</button>')+' <button class="xs danger" onclick="encDel(\''+n.iid+'\')">erase</button></td></tr>';});
-  box.innerHTML=h+'</table>';
+    const dm=findDice(n.dmg||'');
+    h+=`<div class="card enccard">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span><b style="color:var(--gold)">${esc(n.name)}</b> <span class="tag">T${n.tier} ${esc(n.type||'')}</span></span>
+        <span>${inInit?'<button class="xs" disabled>in init</button>':`<button class="xs" onclick="encToInit('${n.iid}')">→ init</button>`} <button class="xs danger" onclick="encDel('${n.iid}')">erase</button></span></div>
+      <div class="row" style="gap:14px;margin:6px 0;font-size:12px">
+        <span>HP ${encStep(n.iid,'hp',n.hp,n.hpmax)}</span><span>Stress ${encStep(n.iid,'stressNow',n.stressNow,n.stressmax)}</span></div>
+      <div class="muted" style="font-size:12px">Diff <b>${n.diff}</b> · thr <b>${n.major||'—'}</b>/<b>${n.severe||'—'}</b> · Atk <b>${(n.atk>=0?'+':'')+(n.atk||0)}</b> · ${esc(n.range||'')} · ${esc(n.dmg||'')}</div>
+      <div class="row" style="margin:6px 0">
+        <button class="sm" onclick="encRoll('${n.iid}','atk')">🎯 ataque d20${n.atk?((n.atk>0?'+':'')+n.atk):''}</button>
+        ${dm?`<button class="sm" onclick="encRoll('${n.iid}','dmg')">💥 daño ${dl(dm)}</button>`:''}</div>
+      ${n.motives?`<div class="muted" style="font-size:11px">Motivos: ${esc(n.motives)}</div>`:''}
+      ${encFeatHTML(n)}
+    </div>`;});
+  box.innerHTML=h+'</div>';
+}
+const ENC_DICE=/\b(\d*)d(\d+)\b(\s*[+-]\s*\d+)?/gi;
+function encFeatHTML(n){
+  const lines=String(n.features||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  if(!lines.length)return '';
+  return '<div style="margin-top:4px">'+lines.map((ln,li)=>{let k=0;
+    const t=esc(ln).replace(ENC_DICE,(m)=>`<button class="xs dbtn" title="tirar ${m}" onclick="encRoll('${n.iid}','f',${li},${k++})">🎲 ${m}</button>`);
+    return `<div class="feat">${t.replace(/^([^:<]{2,40}?)(\s[-–—]\s)/,'<b>$1</b>$2')}</div>`;}).join('')+'</div>';
+}
+function encRoll(iid,what,li,k){
+  const n=STATE.encounter.find(x=>x.iid===iid); if(!n)return;
+  if(what==='atk'){rollExpr(n.name,'attack (vs Evasion)',1,20,n.atk||0,null,1);return;}
+  if(what==='dmg'){const d=findDice(n.dmg||''); if(d)rollExpr(n.name,'damage',d.count,d.sides,d.mod); return;}
+  const ln=String(n.features||'').split('\n').map(x=>x.trim()).filter(Boolean)[li]; if(!ln)return;
+  const all=[...ln.matchAll(ENC_DICE)]; const m=all[k]; if(!m)return;
+  const label=(ln.split(/\s[-–—:]\s|:/)[0]||'feature').slice(0,40);
+  rollExpr(n.name,label,m[1]?+m[1]:1,+m[2],m[3]?+m[3].replace(/\s/g,''):0);
 }
 function encStep(iid,field,cur,max){return `<span class="row" style="gap:3px;flex-wrap:nowrap">
   <button class="xs" onclick="encAdj('${iid}','${field}',-1,${max})">−</button><b>${cur||0}</b><span class="muted">/${max}</span>
@@ -4189,7 +4233,7 @@ function setDot(cls,label){const d=document.getElementById('netdot'); d.classNam
 function setStatus(s){const e=document.getElementById('m-status'); if(e)e.textContent=s;}
 function openConnect(){relayWarnUpdate();document.getElementById('connectModal').classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
-function closeGen(){document.getElementById('genModal').classList.remove('show');}
+function closeGen(){document.getElementById('genModal').classList.remove('show'); document.getElementById('genBox').classList.remove('full');}
 function copyRoom(){const c=document.getElementById('roomCode').textContent; navigator.clipboard&&navigator.clipboard.writeText(c);}
 
 /* ================= AI ASSISTANT (GM) ================= */
@@ -4328,7 +4372,7 @@ function openCreator(){
 }
 function ccRender(){
   const cc=window.__cc, d=cc.d;
-  const box=document.getElementById('genBox'); box.classList.add('wide');
+  const box=document.getElementById('genBox'); box.classList.remove('full'); box.classList.add('wide');
   let h='<h3 style="color:var(--gold)">New Character — step '+cc.step+' of 6</h3>';
   if(cc.step===1){
     h+='<div class="col"><label>Character name</label><input id="cc-name" value="'+esc(d.name)+'"></div>'
@@ -4472,7 +4516,7 @@ function ccTraitPick(slot){
 }
 function openVault(id){
   const ch=STATE.characters[id]; if(!ch)return; const ed=canEdit(ch);
-  const box=document.getElementById('genBox'); box.classList.add('wide');
+  const box=document.getElementById('genBox'); box.classList.remove('full'); box.classList.add('wide');
   let inner=ch.vault.length?('<div class="cardgrid">'+ch.vault.map(k=>{
     const c=findCard(k); if(!c)return ''; const kk=k.replace(/'/g,"\\'");
     return '<div class="gcard"><div class="top"><span class="nm">'+esc(c.name)+'</span><span class="badge lvl">Lv '+c.level+'</span></div>'
@@ -4551,7 +4595,7 @@ function openRoom(){
 }
 function gmInspect(id){const ch=STATE.characters[id]; if(!ch)return;
   window.__forceRO=true; let html=''; try{html=renderOneSheet(ch);}finally{window.__forceRO=false;}
-  const box=document.getElementById('genBox'); box.classList.add('wide');
+  const box=document.getElementById('genBox'); box.classList.add('wide','full');
   box.innerHTML='<div class="row" style="justify-content:space-between"><h3 style="color:var(--gold);margin:0">Inspect — '+esc(ch.name)+' <span class="muted" style="font-size:12px">read-only</span></h3><button class="sm" onclick="closeGen()">close</button></div>'+html;
   document.getElementById('genModal').classList.add('show');
 }
