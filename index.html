@@ -783,6 +783,19 @@
     </div>
   </div>
 
+  <!-- ITEMS (v14.1) -->
+  <div class="panel scroll" id="panel-items" data-pane="items" data-label="Ítems">
+    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+      <input id="itSearch" placeholder="buscar objeto, arma o armadura…" style="flex:1;min-width:180px" oninput="renderItems()">
+      <span class="muted" style="font-size:12px">para:</span><select id="itTarget" onchange="renderItems()"></select>
+      <label class="muted" style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="itCharge" checked onchange="renderItems()"> descontar créditos</label>
+    </div>
+    <div id="itChips" class="chips"></div>
+    <div id="itCount" class="muted" style="font-size:11px;margin:2px 0 8px"></div>
+    <div id="itList"></div>
+    <p class="muted" style="font-size:11px;margin-top:10px">Todo lo que se saca de acá va al inventario del personaje. Las armas y armaduras se equipan desde la hoja con «⇄ equipar».</p>
+  </div>
+
   <!-- RULES -->
   <div class="panel scroll" id="panel-rules" data-pane="rules" data-label="Rules">
     <div class="rulenav" id="ruleNav">
@@ -1008,7 +1021,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.0';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.1';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -1893,8 +1906,8 @@ function layout(role){
   ME.role=role; const gm=role==='gm';
   document.body.classList.toggle('role-gm',gm);
   const stock=document.getElementById('stock');
-  ['map','sheet','characters','npc','fear','dice','rules'].forEach(p=>stock.appendChild(document.getElementById('panel-'+p)));
-  const tabs = gm ? ['characters','map','npc','fear','ai','dice','rules'] : ['sheet','map','dice','rules'];
+  ['map','sheet','characters','npc','fear','dice','items','rules'].forEach(p=>stock.appendChild(document.getElementById('panel-'+p)));
+  const tabs = gm ? ['characters','map','npc','fear','ai','dice','items','rules'] : ['sheet','map','dice','items','rules'];
   const bar=document.getElementById('tabbar'); bar.innerHTML='';
   tabs.forEach(p=>{const el=document.getElementById('panel-'+p); const b=document.createElement('button');
     b.textContent=el.dataset.label; b.dataset.pane=p; b.onclick=()=>showTab(p); bar.appendChild(b);});
@@ -2033,7 +2046,7 @@ function equipmentSection(ch,ed){
   if(ch.secondary)h+=equipCardHTML(ch.secondary,ch,ed,'secondary','weapon');
   h+=`</div><div class="row" style="justify-content:space-between"><b>Items</b>${ed?`<button class="xs" onclick="openEquip('${ch.id}','gear')">+ item</button> <button class="xs" onclick="customItem('${ch.id}')">+ custom</button>`:''}</div>`;
   h+=`<div class="cardgrid" style="margin:6px 0">`;
-  (ch.gear||[]).forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,isWeaponItem(it)?'weapon':'item'));
+  (ch.gear||[]).forEach((it,i)=>h+=equipCardHTML(it,ch,ed,'gear:'+i,isWeaponItem(it)?'weapon':isArmorItem(it)?'armor':'item'));
   h+=`</div>`;
   return h;
 }
@@ -2074,6 +2087,8 @@ function equipCardHTML(e,ch,ed,slot,kind){
   const inGear=slot.startsWith('gear:'), gi=inGear?+slot.split(':')[1]:-1;
   let acts='';
   if(ed){
+    if(inGear&&kind==='armor')acts+=`<button class="xs" onclick="equipFromGear('${ch.id}',${gi},'armorItem')">⇄ equipar armadura</button>`;
+    if(!inGear&&kind==='armor')acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
     if(inGear&&kind==='weapon')acts+=`<button class="xs" onclick="equipFromGear('${ch.id}',${gi},'${e.type==='Secondary'?'secondary':'primary'}')">⇄ equipar como ${e.type==='Secondary'?'secundaria':'primaria'}</button>`;
     if(!inGear&&kind==='weapon')acts+=`<button class="xs" onclick="stowWeapon('${ch.id}','${slot}')">→ inventario</button>`;
     acts+=`<button class="xs danger" onclick="unequip('${ch.id}','${slot}')">${inGear?'quitar':'unequip'}</button>`;
@@ -4004,6 +4019,68 @@ function secGear(q){
   });
   return {html:html||'<p class="muted">Sin resultados.</p>', n};
 }
+/* ================= ITEMS (v14.1) =================
+   Ventana propia del catálogo de equipo. El GM elige un personaje y le envía la pieza;
+   un jugador la saca para su propio personaje. Va al inventario (gear); si «descontar
+   créditos» está marcado, se resta el costo ◈ del campo Credit de la hoja. */
+function isArmorItem(e){return !!(e&&e.baseScore!=null);}
+let itFilter=null;
+const IT_FILTERS=[['weapon','Armas',KIND_COLOR.weapon],['armor','Armaduras',KIND_COLOR.armor],['Arsenal','Arsenal'],['Tech','Tech'],['Artefact','Artefact']];
+function itToggle(k){itFilter=(itFilter===k?null:k); renderItems();}
+function itTargets(){
+  const gm=(ME.isHost||!ME.peer);
+  const pcs=Object.values(STATE.characters).filter(c=>c.owner!=='gm');
+  return gm?pcs:pcs.filter(c=>c.owner===ME.id);
+}
+function itPool(){
+  const g=CG();
+  return [].concat(EQUIP.weapons.map(e=>['weapon',e]),g.weapons.map(e=>['weapon',e]),EQUIP.armor.map(e=>['armor',e]),g.armor.map(e=>['armor',e]),
+                   EQUIP.items.map(e=>['item',e]),g.items.map(e=>['item',e]));
+}
+function renderItems(){
+  const list=document.getElementById('itList'); if(!list)return;
+  const panel=document.getElementById('panel-items'); if(panel&&!panel.isConnected)return;
+  const gm=(ME.isHost||!ME.peer);
+  const sel=document.getElementById('itTarget'), tg=itTargets();
+  const prev=sel.value;
+  sel.innerHTML=(tg.length?'':'<option value="">— sin personaje —</option>')+tg.map(c=>`<option value="${c.id}">${esc(c.name||'PJ')}${gm&&c.playerName?' ('+esc(c.playerName)+')':''}</option>`).join('');
+  if(tg.some(c=>c.id===prev))sel.value=prev;
+  sel.disabled=!gm;
+  const ch=STATE.characters[sel.value]||null;
+  const charge=document.getElementById('itCharge').checked;
+  document.getElementById('itChips').innerHTML=IT_FILTERS.map(([k,t,col])=>`<button class="chip${itFilter===k?' on':''}" style="--cc:${col||categoryColor(k)||'#c8a24a'}" onclick="itToggle('${k}')">${esc(t)}</button>`).join('')
+    +(ch?`<span class="chipsep"></span><span class="muted" style="font-size:12px">${esc(ch.name||'PJ')} · Tier ${tierOf(ch.level||1)} · ◈ ${+ch.gold||0}</span>`:'');
+  const q=normQ(document.getElementById('itSearch').value);
+  const pool=itPool();
+  const hit=pool.filter(([k,e])=>(!itFilter||itFilter===k||itFilter===e.category)&&eqMatch(e,q));
+  document.getElementById('itCount').textContent=hit.length+' ficha'+(hit.length===1?'':'s');
+  list.innerHTML='<div class="cardgrid">'+hit.map(([k,e])=>{
+    const i=pool.findIndex(p=>p[1]===e);
+    let act='';
+    if(ch){
+      const over=(k!=='item')&&(e.tier||1)>tierOf(ch.level||1);
+      const cost=charge&&e.credit!=null?+e.credit:0, poor=cost>(+ch.gold||0);
+      const lbl=gm?'→ enviar a '+esc(ch.name||'PJ'):'+ sacar para mí';
+      act=over?`<span class="muted" style="font-size:11px">sobre el tier de ${esc(ch.name||'PJ')}</span>`
+         :poor?`<span class="muted" style="font-size:11px">faltan créditos (◈ ${cost})</span>`
+         :`<button class="xs primary" onclick="itGive(${i})">${lbl}${cost?' · ◈ '+cost:''}</button>`;
+    }
+    return catGearCard(e,k).replace(/<\/div>\s*$/,(act?`<div class="acts">${act}</div>`:'')+'</div>');
+  }).join('')+'</div>';
+}
+function itGive(i){
+  const sel=document.getElementById('itTarget'); const id=sel&&sel.value; if(!id)return;
+  const [k,e0]=itPool()[i]||[]; if(!e0)return;
+  const ch=copyChar(id); if(!ch)return;
+  const charge=document.getElementById('itCharge').checked;
+  const cost=charge&&e0.credit!=null?+e0.credit:0;
+  if(cost>(+ch.gold||0)){setStatus('No le alcanzan los créditos.');return;}
+  const e=JSON.parse(JSON.stringify(e0)); delete e.used;
+  ch.gear=ch.gear||[]; ch.gear.push(e); if(cost)ch.gold=(+ch.gold||0)-cost;
+  dispatch({kind:'upchar',char:ch});
+  log(null,ch.name,` recibe ${e.name}${cost?' (◈ '+cost+')':''}.`,true);
+  setStatus(e.name+' → inventario de '+(ch.name||'PJ')+'.');
+}
 function renderRules(){
   const inp=document.getElementById('ruleSearch'); if(!inp)return;
   const q=(inp.value||'').toLowerCase().trim();
@@ -4058,7 +4135,7 @@ function refreshAll(){
     const key=(ae.getAttribute('onchange')||'')+'|'+(ae.getAttribute('oninput')||'');
     if(key!=='|')keep={key,tag:ae.tagName,value:ae.value,ss:ae.selectionStart,se:ae.selectionEnd};
   }
-  renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); buildPalette(); updatePeerCount();
+  renderMap(); renderInit(); renderSheet(); renderParty(); renderEnc(); renderNPCtab(); renderFear(); renderEnvFeats(); renderEbList(); renderQuickActions(); renderLog(); renderRules(); renderItems(); buildPalette(); updatePeerCount();
   if(keep){
     const el=[...document.querySelectorAll(keep.tag.toLowerCase())].find(e=>
       ((e.getAttribute('onchange')||'')+'|'+(e.getAttribute('oninput')||''))===keep.key);
