@@ -1021,7 +1021,7 @@ function lsSet(k,v){ if(!LS_OK)return false; try{ localStorage.setItem(k,v); ret
      chicas siguen sirviendo — apagar LS_OK aquí mataba TODO el guardado para siempre. */
   if(!(e&&e.name==='QuotaExceededError'))LS_OK=false; return false; } }
 function lsDel(k){ if(!LS_OK)return; try{ localStorage.removeItem(k); }catch(e){ LS_OK=false; } }
-const PH_BUILD='v14.4';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
+const PH_BUILD='v14.5';   /* El tag DEBE cambiar en cada version: con varias builds en la carpeta era imposible saber cual estabas abriendo. */
 /* Relay propio: host guardado sin esquema (ej. "pulpheart-relay.onrender.com").
    Devuelve la base wss:// para el socket, o '' si todavía no hay ninguno. */
 function relayBase(){
@@ -2089,15 +2089,16 @@ function usesOf(e){
   const m=String(e.name||'').match(/\((\d+)\s*(?:rds?|uses?)?\)/i); return m?+m[1]:0;
 }
 function usesHTML(e,ch,ed,slot){
-  if(!slot.startsWith('gear:'))return '';
   const n=usesOf(e), used=Math.min(n,+e.used||0);
-  if(!n&&(!ed||isWeaponItem(e)))return '';
+  if(!n&&ed&&isWeaponItem(e))return `<div class="uses"><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="darle usos o cargador a esta arma">+ usos</button></div>`;
+  if(!n&&(!ed||!slot.startsWith('gear:')))return '';
   let p='';
   for(let k=0;k<n;k++)p+=`<span class="pip${k<used?' on':''}${ed?'':' ro'}"${ed?` onclick="useToggle('${ch.id}','${slot}',${k})"`:''} title="${k<used?'usado':'disponible'}"></span>`;
   const ul=usesLabel(e), per=/\//.test(ul)?' ('+ul.replace('scene','escena').replace('session','sesión')+')':/mag/.test(ul)?' (cargador)':'';
-  return `<div class="uses"><span class="muted">Usos${n?` ${n-used}/${n}`:''}${per}:</span>${p}${ed?`<button class="xs" onclick="usesAdj('${ch.id}','${slot}',-1)" title="un uso menos">−</button><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="un uso más">+</button>`:''}</div>`;
+  return `<div class="uses"><span class="muted">Usos${n?` ${n-used}/${n}`:''}${per}:</span>${p}${ed?`<button class="xs" onclick="usesAdj('${ch.id}','${slot}',-1)" title="un uso menos">−</button><button class="xs" onclick="usesAdj('${ch.id}','${slot}',1)" title="un uso más">+</button>${used?`<button class="xs" onclick="usesReset('${ch.id}','${slot}')" title="recargar: deja todos los usos disponibles">↺ recargar</button>`:''}`:''}</div>`;
 }
-function gearRef(ch,slot){const i=+slot.split(':')[1]; return ch.gear&&ch.gear[i];}
+function gearRef(ch,slot){if(!String(slot).startsWith('gear:'))return ch[slot]||null; const i=+slot.split(':')[1]; return ch.gear&&ch.gear[i];}
+function usesReset(id,slot){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return; if(e.uses==null)e.uses=usesOf(e); e.used=0; dispatch({kind:'upchar',char:ch});}
 function useToggle(id,slot,k){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return;
   const used=+e.used||0; e.used=(k<used)?k:k+1; if(e.uses==null)e.uses=usesOf(e); dispatch({kind:'upchar',char:ch});}
 function usesAdj(id,slot,d){const ch=copyChar(id); const e=gearRef(ch,slot); if(!e)return;
